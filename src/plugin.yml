@@ -1,0 +1,9 @@
+name: CommandBlock-Support
+main: net.ME1312.CBS.CBS
+version: "1.18.2a"
+authors: ["ME1312"]
+website: "https://github.com/ME1312/CommandBlock-Support"
+commands:
+  cbs:
+    description: "CommandBlock Support"
+    usage: "/cbs [-flags] [command] [args...]"

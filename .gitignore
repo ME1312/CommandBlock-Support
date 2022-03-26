@@ -1,0 +1,8 @@
+# Hide System and IDE Generated Files
+/out/
+.idea/
+*.iml
+.DS_STORE
+
+# Hide Compiled Artifacts
+/artifacts/*
