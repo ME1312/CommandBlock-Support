@@ -28,8 +28,8 @@ This can be done with ease by re-running `/cbs` with the helpful debugging flag 
 Pay extra attention to methods that report they are *untranslated*, as that means they are returning default values such as `null` (or `0` for primitive types).<br>
 
 **Step 2:** Translate those problematic methods.
-This is done by placing a method with the same name and parameters into [`PlayerTranslator`](https://github.com/ME1312/CommandBlock-Support/blob/master/src/net/ME1312/CBS/PlayerTranslator.java).
-It's functionally the same as overriding a method from [`Player`](https://hub.spigotmc.org/javadocs/spigot/org/bukkit/entity/Player.html).
+This is done by placing a method with the same name and parameters into [`EmulatedPlayer`](https://github.com/ME1312/CommandBlock-Support/blob/master/src/net/ME1312/CBS/EmulatedPlayer.java).
+It's functionally the same as overriding a method from bukkit's [`Player`](https://hub.spigotmc.org/javadocs/spigot/org/bukkit/entity/Player.html) class.
 
 **Step 3:** Repeat this process until it starts working.
 If you are having trouble and in need of more debugging information regarding how the plugin makes translations, start your server with the JVM flag `-Dcbs.debug=true`.
