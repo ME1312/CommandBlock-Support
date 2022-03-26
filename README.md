@@ -1,7 +1,7 @@
 # CommandBlock Support
 [![Build Status](https://dev.me1312.net/jenkins/job/CommandBlock%20Support/badge/icon)](https://dev.me1312.net/jenkins/job/CommandBlock%20Support/) 
 [![Release Verison](https://img.shields.io/github/release/ME1312/CommandBlock-Support/all.svg)](https://github.com/ME1312/CommandBlock-Support/releases)<br><br>
-CommandBlock Support (CBS) lets you use commands that are normally only available to players in Command Blocks.<br>
+CommandBlock Support lets you use commands that are normally only available to players in Command Blocks.<br>
 > [https://www.spigotmc.org/resources/commandblock-support.xxxxx/](https://github.com/ME1312/CommandBlock-Support/wiki/)
 
 
