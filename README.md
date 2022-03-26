@@ -1,10 +1,9 @@
 # CommandBlock Support
 [![Build Status](https://dev.me1312.net/jenkins/job/CommandBlock%20Support/badge/icon)](https://dev.me1312.net/jenkins/job/CommandBlock%20Support/) 
 [![Release Verison](https://img.shields.io/github/release/ME1312/CommandBlock-Support/all.svg)](https://github.com/ME1312/CommandBlock-Support/releases)<br><br>
-CommandBlock Support (CBS) lets you use commands that are normally only available to players in Command Blocks (and the console too).<br>
+CommandBlock Support (CBS) lets you use commands that are normally only available to players in Command Blocks.<br>
 > [https://www.spigotmc.org/resources/commandblock-support.xxxxx/](https://github.com/ME1312/CommandBlock-Support/wiki/)
 
-<br>
 
 ## Quick Links
 These are some quick links for common resources of CBS.
@@ -18,7 +17,6 @@ These are some quick links for common resources of CBS.
 ### Stats for nerds
 > [https://bstats.org/plugin/bungeecord/CommandBlock_Support](https://bstats.org/plugin/bukkit/CommandBlock%20Support)<br>
 
-<br>
 
 ## Contributing Translations
 If you've found a command that doesn't work with this plugin, and you have what it takes to solve that problem, then let this section be your guide in your quest to create a pull request.<br>
