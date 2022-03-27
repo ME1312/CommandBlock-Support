@@ -1,32 +1,34 @@
 package net.ME1312.CBS;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Directional;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.CommandException;
-import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.util.Vector;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.util.PrimitiveIterator;
-import java.util.UUID;
+import java.util.*;
 
 import static org.bukkit.ChatColor.*;
 
-final class Command implements CommandExecutor {
+final class Command extends org.bukkit.command.Command {
     private final RuntimeException FAILURE;
+    private final MethodHandle COMMANDS;
     private final Class<?> CBS;
     private final boolean FLAT;
     private final EmulationManager plugin;
-    Command(EmulationManager plugin, Class<?> extension, RuntimeException reference) {
+    Command(EmulationManager plugin, Class<?> extension, RuntimeException reference) throws Throwable {
+        super("cbs", "CommandBlock Support", "/cbs [-flags] [command] [args...]", Collections.emptyList());
         this.plugin = plugin;
         boolean flat;
         try { // noinspection ConstantConditions
@@ -34,6 +36,14 @@ final class Command implements CommandExecutor {
         } catch (NoSuchMethodException | NoSuchMethodError e) {
             flat = false;
         }
+        Server server = Bukkit.getServer();
+        Field commands = server.getClass().getDeclaredField("commandMap");
+        commands.setAccessible(true);
+        ((CommandMap) (COMMANDS = MethodHandles.publicLookup()
+                .unreflectGetter(commands)
+                .asType(MethodType.methodType(CommandMap.class, Server.class))
+        ).invokeExact(server)).register("cbs", this);
+
         FLAT = flat;
         CBS = extension;
         FAILURE = reference;
@@ -44,7 +54,7 @@ final class Command implements CommandExecutor {
     }
 
     @SuppressWarnings("NullableProblems")
-    public boolean onCommand(CommandSender sender, org.bukkit.command.Command context, String label, String[] args) {
+    public boolean execute(CommandSender sender, String label, String[] args) {
         if (args.length == 0) {
             PluginDescriptionFile desc = plugin.plugin.getDescription();
             sender.sendMessage("");
@@ -53,6 +63,19 @@ final class Command implements CommandExecutor {
             sender.sendMessage("");
             sender.sendMessage(GRAY + ITALIC.toString() + UNDERLINE + desc.getWebsite() + "/wiki/Flags");
             sender.sendMessage("");
+        } else if (args[0].matches("-+m")) {
+            if (args.length > 1) { // Minimal mode (-m) has the sender run the command as themselves. No further permission checks required.
+                boolean success = run(sender, sender, args, 1);
+                if (!success) {
+                    if (sender instanceof BlockCommandSender) {
+                        throw FAILURE;
+                    } else {
+                        return sender.getClass() != CBS;
+                    }
+                }
+            } else {
+                sender.sendMessage(prefix(RED, DARK_RED) + "No command to execute");
+            }
         } else {
             boolean sub = false, debug = false;
             double x = 0, y = 0, z = 0;
@@ -64,7 +87,7 @@ final class Command implements CommandExecutor {
             if (sender instanceof Player) {
                 if (sender.getClass() == CBS) {
                     sender.sendMessage(prefix(RED, DARK_RED) + "This command cannot be nested");
-                    throw FAILURE;
+                    return false;
                 } else if (!sender.isOp()) {
                     sender.sendMessage(prefix(RED, DARK_RED) + "This command may only be tested by server operators");
                     return true;
@@ -179,6 +202,9 @@ final class Command implements CommandExecutor {
                                     throw new CommandException("Invalid decimal number: " + DARK_RED + n);
                                 }
                             }
+                            case 'm': {
+                                throw new CommandException("The " + DARK_RED + "-m" + RED + " flag cannot be combined with any other flags");
+                            }
                             case '-': if (starting) {
                                 continue;
                             }
@@ -208,7 +234,7 @@ final class Command implements CommandExecutor {
                     boolean execute = i < args.length;
                     if (execute || sub) player.subs.add(sender);
                     if (execute) {
-                        if (!Bukkit.getServer().dispatchCommand(player.getPlayer(), join(args, i)) && sender instanceof BlockCommandSender) {
+                        if (!run(sender, player.getPlayer(), args, i) && sender instanceof BlockCommandSender) {
                             throw FAILURE;
                         }
                     } else {
@@ -220,6 +246,23 @@ final class Command implements CommandExecutor {
             }
         }
         return true;
+    }
+
+    private boolean run(CommandSender sender, CommandSender target, String[] args, int i) {
+        org.bukkit.command.Command command;
+        String label = args[i];
+        try {
+            command = ((CommandMap) COMMANDS.invoke(Bukkit.getServer())).getCommand(label);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+
+        if (command == null) {
+            sender.sendMessage(prefix(RED, DARK_RED) + "Unknown command: " + RED + label);
+            return false;
+        } else {
+            return command.execute(target, label, Arrays.copyOfRange(args, ++i, args.length));
+        }
     }
 
     private static void flag(int length, int args, String usage) {
@@ -242,16 +285,8 @@ final class Command implements CommandExecutor {
         }
     }
 
-    private static String join(String[] args, int i) {
-        String command = args[i++];
-        if (i < args.length) {
-            StringBuilder builder = new StringBuilder(command);
-            do {
-                builder.append(' ');
-                builder.append(args[i]);
-            } while (++i < args.length);
-            command = builder.toString();
-        }
-        return command;
+    @Override
+    public List<String> tabComplete(CommandSender sender, String label, String[] args) throws IllegalArgumentException {
+        return super.tabComplete(sender, label, args); // TODO
     }
 }

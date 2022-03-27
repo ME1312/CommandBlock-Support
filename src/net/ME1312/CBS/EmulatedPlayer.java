@@ -83,17 +83,17 @@ public final class EmulatedPlayer /* extends Player */ {
             }
             msg.append("}\nreturns: ")
                     .append(returns.getCanonicalName())
-                    .append("\ncallers:");
+                    .append("\ncallers:\n    ");
             int i = 2;
             do {
                 e = stack[i];
                 if (CBS.equals(e.getClassName())) {
-                    msg.replace(msg.lastIndexOf("\n") + 5, msg.length(), "... ")
-                            .append(stack.length + 1 - i)
+                    msg.append("... ")
+                            .append(stack.length - i)
                             .append(" more");
                     break;
                 }
-                msg.append("\n    ").append(e);
+                msg.append(e).append("\n    ");
             } while (++i < stack.length);
             msg.append('\n');
             Bukkit.getLogger().log((translated)? Level.INFO : Level.WARNING, msg.toString());

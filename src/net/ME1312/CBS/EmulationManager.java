@@ -34,7 +34,7 @@ public final class EmulationManager {
                 .findConstructor(extension, MethodType.methodType(void.class, EmulatedPlayer.class))
                 .asType(MethodType.methodType(void.class, EmulatedPlayer.class));
 
-        plugin.getCommand("cbs").setExecutor(new Command(this, extension, reference));
+        new Command(this, extension, reference);
         new BStats(plugin, 14759).addCustomChart(new BStats.SingleLineChart("emulators", players::size));
     }
 
