@@ -132,7 +132,10 @@ public final class EmulatedPlayer /* extends Player */ {
     public Spigot spigot() {
         return new Spigot();
     }
-    public final class Spigot extends Player.Spigot {
+
+    private final class Spigot extends Player.Spigot {
+        private Spigot() {}
+
         @Override
         public void sendMessage(BaseComponent msg) {
             for (CommandSender s : subs) s.spigot().sendMessage(msg);
