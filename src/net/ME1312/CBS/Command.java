@@ -5,12 +5,15 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Directional;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.CommandException;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
+import org.bukkit.util.Vector;
 
 import java.nio.charset.StandardCharsets;
 import java.util.PrimitiveIterator;
@@ -21,11 +24,19 @@ import static org.bukkit.ChatColor.*;
 final class Command implements CommandExecutor {
     private final RuntimeException FAILURE;
     private final Class<?> CBS;
+    private final boolean FLAT;
     private final EmulationManager plugin;
     Command(EmulationManager plugin, Class<?> extension, RuntimeException reference) {
         this.plugin = plugin;
-        FAILURE = reference;
+        boolean flat;
+        try { // noinspection ConstantConditions
+            flat = Block.class.getMethod("getBlockData") != null;
+        } catch (NoSuchMethodException | NoSuchMethodError e) {
+            flat = false;
+        }
+        FLAT = flat;
         CBS = extension;
+        FAILURE = reference;
     }
 
     private String prefix(ChatColor color, ChatColor accent) {
@@ -72,6 +83,29 @@ final class Command implements CommandExecutor {
                 x = block.getX();
                 y = block.getY();
                 z = block.getZ();
+                if (FLAT) {
+                    BlockFace mod = ((Directional) block.getBlockData()).getFacing();
+                    yaw = (float) (-Math.atan2(mod.getModX(), mod.getModZ()) / Math.PI * 180.0);
+                    pitch = (float) (Math.asin(mod.getModY() / new Vector(mod.getModX(), mod.getModY(), mod.getModZ()).length()) * 180.0 / Math.PI);
+                } else {
+                    switch ((block.getData() & 7) % 6) {
+                        case 0:
+                            pitch = 90;
+                            break;
+                        case 1:
+                            pitch = -90;
+                            break;
+                        case 2:
+                            yaw = -180;
+                            break;
+                        case 4:
+                            yaw = 90;
+                            break;
+                        case 5:
+                            yaw = -90;
+                            break;
+                    }
+                }
             }
 
             int i = 0;
