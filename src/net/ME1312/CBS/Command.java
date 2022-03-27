@@ -208,7 +208,6 @@ final class Command implements CommandExecutor {
                     boolean execute = i < args.length;
                     if (execute || sub) player.subs.add(sender);
                     if (execute) {
-
                         if (!Bukkit.getServer().dispatchCommand(player.getPlayer(), join(args, i)) && sender instanceof BlockCommandSender) {
                             throw FAILURE;
                         }

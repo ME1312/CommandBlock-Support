@@ -23,7 +23,7 @@ public final class EmulationManager {
         this.plugin = plugin;
 
         // Generate extended class
-        byte[] data = new PlayerVisitor().scan(Player.class).flip();
+        byte[] data = new PlayerVisitor().translate(Player.class).flip();
         if (PlayerVisitor.DEBUG && (plugin.getDataFolder().isDirectory() || plugin.getDataFolder().mkdirs())) {
             FileOutputStream fos = new FileOutputStream(new File(plugin.getDataFolder(), "EmulatedExtension.class"), false);
             fos.write(data);

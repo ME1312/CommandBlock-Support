@@ -5,7 +5,8 @@ import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.filter.AbstractFilter;
 
-import static org.apache.logging.log4j.core.Filter.Result.*;
+import static org.apache.logging.log4j.core.Filter.Result.DENY;
+import static org.apache.logging.log4j.core.Filter.Result.NEUTRAL;
 
 final class ReferenceFilter extends AbstractFilter {
     private static boolean registered = false;

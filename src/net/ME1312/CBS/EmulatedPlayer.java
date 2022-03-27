@@ -39,7 +39,6 @@ public final class EmulatedPlayer /* extends Player */ {
         this.player = instance;
     }
 
-    @SuppressDebugging
     public void $(boolean translated, Class<?> returns, Class<?>[] params, Object[] args) {
         StackTraceElement[] stack = new Throwable().getStackTrace();
         if (stack.length > 3) {
@@ -130,40 +129,41 @@ public final class EmulatedPlayer /* extends Player */ {
     }
 
     @SuppressDebugging
-    public Player.Spigot spigot() {
-        return new Player.Spigot() {
-            @Override
-            public void sendMessage(BaseComponent msg) {
-                for (CommandSender s : subs) s.spigot().sendMessage(msg);
-            }
+    public Spigot spigot() {
+        return new Spigot();
+    }
+    public final class Spigot extends Player.Spigot {
+        @Override
+        public void sendMessage(BaseComponent msg) {
+            for (CommandSender s : subs) s.spigot().sendMessage(msg);
+        }
 
-            @Override
-            public void sendMessage(BaseComponent... msgs) {
-                for (CommandSender s : subs) s.spigot().sendMessage(msgs);
-            }
+        @Override
+        public void sendMessage(BaseComponent... msgs) {
+            for (CommandSender s : subs) s.spigot().sendMessage(msgs);
+        }
 
-            @Override
-            public void sendMessage(ChatMessageType ctx, BaseComponent msg) {
-                if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT) sendMessage(msg);
-            }
+        @Override
+        public void sendMessage(ChatMessageType ctx, BaseComponent msg) {
+            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT) sendMessage(msg);
+        }
 
-            @Override
-            public void sendMessage(ChatMessageType ctx, BaseComponent... msgs) {
-                if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT) sendMessage(msgs);
-            }
+        @Override
+        public void sendMessage(ChatMessageType ctx, BaseComponent... msgs) {
+            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT) sendMessage(msgs);
+        }
 
-            @Override
-            public void sendMessage(ChatMessageType ctx, UUID sender, BaseComponent msg) {
-                if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT)
-                    for (CommandSender s : subs) s.spigot().sendMessage(sender, msg);
-            }
+        @Override
+        public void sendMessage(ChatMessageType ctx, UUID sender, BaseComponent msg) {
+            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT)
+                for (CommandSender s : subs) s.spigot().sendMessage(sender, msg);
+        }
 
-            @Override
-            public void sendMessage(ChatMessageType ctx, UUID sender, BaseComponent... msgs) {
-                if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT)
-                    for (CommandSender s : subs) s.spigot().sendMessage(sender, msgs);
-            }
-        };
+        @Override
+        public void sendMessage(ChatMessageType ctx, UUID sender, BaseComponent... msgs) {
+            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT)
+                for (CommandSender s : subs) s.spigot().sendMessage(sender, msgs);
+        }
     }
 
     @SuppressDebugging
