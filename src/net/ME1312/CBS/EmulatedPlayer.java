@@ -53,7 +53,7 @@ public final class EmulatedPlayer /* extends Player */ {
                     .append(params.length)
                     .append(")\ninstance: ")
                     .append(uid);
-            if (name.length() > 0 && !name.equals(uid)) {
+            if (!name.equals(uid)) {
                 msg.append(" (")
                         .append(name)
                         .append(')');

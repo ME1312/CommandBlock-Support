@@ -47,7 +47,7 @@ final class Command implements CommandExecutor {
             double x = 0, y = 0, z = 0;
             float yaw = 0, pitch = 0;
             World world = null;
-            String name = "";
+            String name = null;
             UUID uid = null;
 
             if (sender instanceof Player) {
@@ -164,9 +164,9 @@ final class Command implements CommandExecutor {
             if (world == null) {
                 sender.sendMessage(prefix(RED, DARK_RED) + "The " + DARK_RED + "-w" + RED + " flag must be used when sending from console");
             } else {
-                if (uid == null) uid = UUID.nameUUIDFromBytes(((name.length() == 0)? "cbs:" : "cbs:" + name).getBytes(StandardCharsets.UTF_8));
+                if (uid == null) uid = UUID.nameUUIDFromBytes(((name == null)? "cbs:" : "cbs:" + name).getBytes(StandardCharsets.UTF_8));
                 EmulatedPlayer player = plugin.getPlayer(uid);
-                player.name = name;
+                if (name != null) player.name = name;
                 player.pos = new Location(world, x, y, z, yaw, pitch);
                 player.debug = debug;
 
