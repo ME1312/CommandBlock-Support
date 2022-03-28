@@ -75,10 +75,9 @@ final class Command extends org.bukkit.command.Command {
             sender.sendMessage("");
             sender.sendMessage(GRAY + ITALIC.toString() + UNDERLINE + desc.getWebsite() + "/wiki/Flags");
             sender.sendMessage("");
-        } else if (args[0].matches("-+m")) {
-            if (args.length > 1) { // Minimal mode (-m) has the sender run the command as themselves. No further permission checks required.
-                boolean success = run(sender, sender, args, 1);
-                if (!success) {
+        } else if (args[0].matches("-+m(?:;.*)?")) {
+            if (args.length != 1) { // Minimal mode (-m) has the sender run the command as themselves. No further permission checks required.
+                if (!run(sender, sender, args, 1)) {
                     if (sender instanceof BlockCommandSender) {
                         throw FAILURE;
                     } else {
@@ -145,14 +144,10 @@ final class Command extends org.bukkit.command.Command {
 
             int i = 0;
             try {
-                boolean parsing = true, starting = true;
-                for (int c; parsing && i < args.length && args[i].startsWith("-"); ++i, starting = true) {
+                boolean starting = true;
+                for (int c; i < args.length && args[i].startsWith("-"); ++i, starting = true) {
                     for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) {
                         switch (c = $i.nextInt()) {
-                            case 'b': {
-                                parsing = false;
-                                break;
-                            }
                             case 'd': {
                                 debug = true;
                                 break;
@@ -221,6 +216,9 @@ final class Command extends org.bukkit.command.Command {
                             case 'm': {
                                 throw new CommandException("The " + DARK_RED + "-m" + RED + " flag cannot be combined with any other flags");
                             }
+                            case ';': {
+                                throw FAILURE;
+                            }
                             case '-': if (starting) {
                                 continue;
                             }
@@ -235,6 +233,9 @@ final class Command extends org.bukkit.command.Command {
                 if (sender instanceof BlockCommandSender) throw FAILURE;
                 sender.sendMessage(prefix(RED, DARK_RED) + e.getMessage());
                 return true;
+            } catch (RuntimeException e) {
+                if (e != FAILURE) throw e;
+                ++i;
             }
 
             if (world == null) {
@@ -343,7 +344,7 @@ final class Command extends org.bukkit.command.Command {
             final LinkedList<Integer> available = new LinkedList<Integer>(FLAGS.keySet());
             final LinkedList<String> values = new LinkedList<String>();
             final String LAST = (args.length > 0)?args[args.length - 1]:"";
-            available.addFirst((int) 'b');
+            available.addFirst((int) ';');
             available.add((int) 'm');
 
             int i = 0;
@@ -353,15 +354,14 @@ final class Command extends org.bukkit.command.Command {
                 Flag flag;
                 boolean starting = true;
                 for (int x; parsing && args[i].startsWith("-"); i = x, starting = true) {
-                    for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) {
+                    for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) try {
                         if ((flag = FLAGS.get(x = $i.nextInt())) != null) {
-                            available.removeAll(flag.overrides);
                             values.addAll(flag.arguments);
-                        } else if (x == 'b') {
-                            available.remove((Object) x);
-                            parsing = false;
+                            available.removeAll(flag.overrides);
                         } else if (x == 'm') {
                             available.clear();
+                        } else if (x == ';') {
+                            throw FAILURE;
                         } else if (x == '-' && starting) {
                             continue;
                         }
@@ -370,6 +370,11 @@ final class Command extends org.bukkit.command.Command {
                             available.remove((Object) (int) 'm');
                             starting = false;
                         }
+                    } catch (RuntimeException e) {
+                        if (e != FAILURE) throw e;
+                        available.clear();
+                        parsing = false;
+                        break;
                     }
 
                     try { // definition of variable x changes here!
