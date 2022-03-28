@@ -14,6 +14,7 @@ import org.bukkit.util.Vector;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +23,10 @@ import java.util.*;
 import static org.bukkit.ChatColor.*;
 
 final class Command extends org.bukkit.command.Command {
+    private static final Map<Integer, Flag> FLAGS;
+    private static final boolean TAB_LOCATION;
     private final RuntimeException FAILURE;
+    private final MethodHandle COMMAND_MAP;
     private final MethodHandle COMMANDS;
     private final Class<?> CBS;
     private final boolean FLAT;
@@ -36,16 +40,24 @@ final class Command extends org.bukkit.command.Command {
         } catch (NoSuchMethodException | NoSuchMethodError e) {
             flat = false;
         }
-        Server server = Bukkit.getServer();
-        Field commands = server.getClass().getDeclaredField("commandMap");
-        commands.setAccessible(true);
-        ((CommandMap) (COMMANDS = MethodHandles.publicLookup()
-                .unreflectGetter(commands)
-                .asType(MethodType.methodType(CommandMap.class, Server.class))
-        ).invokeExact(server)).register("cbs", this);
-
-        FLAT = flat;
         CBS = extension;
+        FLAT = flat;
+        Server server = Bukkit.getServer();
+        Class<?> clazz = server.getClass();
+        Lookup lookup = MethodHandles.lookup();
+        Field field = clazz.getDeclaredField("commandMap"); field.setAccessible(true);
+        ((CommandMap) (COMMANDS = lookup.unreflectGetter(field).asType(MethodType.methodType(CommandMap.class, Server.class))).invokeExact(server)).register("cbs", this);
+
+        clazz = field.getType();
+        MethodHandle handle;
+        for (;;) try {
+            field = clazz.getDeclaredField("knownCommands"); field.setAccessible(true);
+            handle = lookup.unreflectGetter(field).asType(MethodType.methodType(Map.class, CommandMap.class));
+            break;
+        } catch (NoSuchFieldException e) {
+            if ((clazz = clazz.getSuperclass()) == null) throw e;
+        }
+        COMMAND_MAP = handle;
         FAILURE = reference;
     }
 
@@ -285,8 +297,128 @@ final class Command extends org.bukkit.command.Command {
         }
     }
 
-    @Override
+    static {
+        HashMap<Integer, Flag> flags = new HashMap<Integer, Flag>();
+        flags.compute((int) 'd', (c, v) -> new Flag(Collections.emptyList(), c));
+        flags.compute((int) 's', (c, v) -> new Flag(Collections.emptyList(), c));
+        flags.compute((int) 'n', (c, v) -> new Flag(Collections.singletonList("<username>"), c));
+        flags.compute((int) 'u', (c, v) -> new Flag(Collections.singletonList("<uuid>"), c));
+        flags.compute((int) 'w', (c, v) -> new Flag(Collections.singletonList("<world>"), c));
+        flags.compute((int) 'x', (c, v) -> new Flag(Collections.singletonList("<x>"), c, 'v'));
+        flags.compute((int) 'y', (c, v) -> new Flag(Collections.singletonList("<y>"), c, 'v'));
+        flags.compute((int) 'z', (c, v) -> new Flag(Collections.singletonList("<z>"), c, 'v'));
+        flags.compute((int) 'v', (c, v) -> new Flag(Arrays.asList("<x>", "<y>", "<z>"), c, 'x', 'y', 'z'));
+        flags.compute((int) 'c', (c, v) -> new Flag(Arrays.asList("<yaw>", "<pitch>"), c));
+        FLAGS = Collections.unmodifiableMap(flags);
+        boolean location;
+        try { // noinspection ConstantConditions
+            location = org.bukkit.command.Command.class.getMethod("tabComplete", CommandSender.class, String.class, String[].class, Location.class) != null;
+        } catch (NoSuchMethodException e) {
+            location = false;
+        }
+        TAB_LOCATION = location;
+    }
+
+    private static final class Flag {
+        private final List<String> arguments;
+        private final List<Integer> overrides;
+        private Flag(List<String> arguments, int... overrides) {
+            this.arguments = arguments;
+            this.overrides = new ArrayList<>(overrides.length);
+            for (int i : overrides) this.overrides.add(i);
+        }
+    }
+
     public List<String> tabComplete(CommandSender sender, String label, String[] args) throws IllegalArgumentException {
-        return super.tabComplete(sender, label, args); // TODO
+        return tabComplete(sender, label, args, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> tabComplete(CommandSender sender, String label, String[] args, Location location) throws IllegalArgumentException {
+        if (sender.isOp()) {
+            final LinkedList<Integer> available = new LinkedList<Integer>(FLAGS.keySet());
+            final LinkedList<String> values = new LinkedList<String>();
+            final String LAST = (args.length > 0)?args[args.length - 1]:"";
+            available.add((int) 'm');
+
+            int i = 0;
+            String arg = null;
+            if (args.length != 0) {
+                Flag flag;
+                boolean starting = true;
+                for (int x; args[i].startsWith("-"); i = x, starting = true) {
+                    for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) {
+                        if ((flag = FLAGS.get(x = $i.nextInt())) != null) {
+                            values.addAll(flag.arguments);
+                            available.removeAll(flag.overrides);
+                        } else if (x == 'm') {
+                            available.clear();
+                        } else if (x == '-' && starting) {
+                            continue;
+                        }
+
+                        if (starting) {
+                            available.remove((Object) (int) 'm');
+                            starting = false;
+                        }
+                    }
+
+                    try { // definition of variable x changes here!
+                        x = ++i + values.size();
+                        if (x >= args.length) {
+                            if (i < args.length && values.size() != 0) {
+                                arg = values.get(args.length - 1 - i);
+                            }
+                            break;
+                        }
+                    } finally {
+                        values.clear();
+                    }
+                }
+            }
+
+            if (arg != null) {
+                values.add(arg);
+
+            } else if (i == args.length - 1 || args.length == 0) {
+                final String last = LAST.toLowerCase(Locale.ENGLISH);
+                final Map<String, ?> map;
+                try {
+                    map = (Map<String, ?>) COMMAND_MAP.invokeExact((CommandMap) COMMANDS.invoke(Bukkit.getServer()));
+                } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                }
+
+                for (String command : map.keySet()) if (command.startsWith(last)) {
+                    values.add(LAST + command.substring(LAST.length()));
+                }
+                Collections.sort(values);
+                if (LAST.length() == 0 && !values.contains("-")) {
+                    values.addFirst("-");
+                }
+            } else if (i < args.length) {
+                org.bukkit.command.Command command;
+                try {
+                    command = ((CommandMap) COMMANDS.invoke(Bukkit.getServer())).getCommand(args[i]);
+                } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                }
+
+                if (command != null) {
+                    if (TAB_LOCATION) {
+                        return command.tabComplete(sender, args[i], Arrays.copyOfRange(args, ++i, args.length), location);
+                    } else {
+                        return command.tabComplete(sender, args[i], Arrays.copyOfRange(args, ++i, args.length));
+                    }
+                }
+            } else {
+                for (Integer c : available) {
+                    values.add(new StringBuilder(LAST).appendCodePoint(c).toString());
+                }
+            }
+            return values;
+        } else {
+            return Collections.emptyList();
+        }
     }
 }

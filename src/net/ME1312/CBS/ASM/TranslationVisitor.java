@@ -103,7 +103,7 @@ class TranslationVisitor extends ClassVisitor {
                 @Override
                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                     if (descriptor.equals(DEBUG_DESC)) debugging = false;
-                    if (descriptor.equals(TRANSLATION)) {
+                    else if (descriptor.equals(TRANSLATION)) {
                         final String returns = Type.getReturnType(descriptor).getDescriptor();
                         return new AnnotationVisitor(ASM9) {
                             @Override
