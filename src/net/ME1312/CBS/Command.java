@@ -75,7 +75,7 @@ final class Command extends org.bukkit.command.Command {
             sender.sendMessage("");
             sender.sendMessage(GRAY + ITALIC.toString() + UNDERLINE + desc.getWebsite() + "/wiki/Flags");
             sender.sendMessage("");
-        } else if (args[0].matches("-+m(?:;.*)?")) {
+        } else if (args[0].matches("-+m+(?:;.*)?")) {
             if (args.length != 1) { // Minimal mode (-m) has the sender run the command as themselves. No further permission checks required.
                 if (!run(sender, sender, args, 1)) {
                     if (sender instanceof BlockCommandSender) {
