@@ -303,7 +303,7 @@ final class Command extends org.bukkit.command.Command {
     }
 
     static {
-        HashMap<Integer, Flag> flags = new HashMap<Integer, Flag>();
+        Map<Integer, Flag> flags = new LinkedHashMap<Integer, Flag>();
         flags.compute((int) 'd', (c, v) -> new Flag(Collections.emptyList(), c));
         flags.compute((int) 's', (c, v) -> new Flag(Collections.emptyList(), c));
         flags.compute((int) 'n', (c, v) -> new Flag(Collections.singletonList("<username>"), c));
