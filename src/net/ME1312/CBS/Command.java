@@ -145,10 +145,14 @@ final class Command extends org.bukkit.command.Command {
 
             int i = 0;
             try {
-                boolean starting = true;
-                for (int c; i < args.length && args[i].startsWith("-"); ++i, starting = true) {
+                boolean parsing = true, starting = true;
+                for (int c; parsing && i < args.length && args[i].startsWith("-"); ++i, starting = true) {
                     for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) {
                         switch (c = $i.nextInt()) {
+                            case 'b': {
+                                parsing = false;
+                                break;
+                            }
                             case 'd': {
                                 debug = true;
                                 break;
@@ -270,7 +274,7 @@ final class Command extends org.bukkit.command.Command {
         }
 
         if (command == null) {
-            sender.sendMessage(prefix(RED, DARK_RED) + "Unknown command: " + RED + label);
+            sender.sendMessage(prefix(RED, DARK_RED) + "Unknown command: " + DARK_RED + '/' + label);
             return false;
         } else {
             return command.execute(target, label, Arrays.copyOfRange(args, ++i, args.length));
@@ -339,18 +343,23 @@ final class Command extends org.bukkit.command.Command {
             final LinkedList<Integer> available = new LinkedList<Integer>(FLAGS.keySet());
             final LinkedList<String> values = new LinkedList<String>();
             final String LAST = (args.length > 0)?args[args.length - 1]:"";
+            available.addFirst((int) 'b');
             available.add((int) 'm');
 
             int i = 0;
             String arg = null;
+            boolean parsing = true;
             if (args.length != 0) {
                 Flag flag;
                 boolean starting = true;
-                for (int x; args[i].startsWith("-"); i = x, starting = true) {
+                for (int x; parsing && args[i].startsWith("-"); i = x, starting = true) {
                     for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) {
                         if ((flag = FLAGS.get(x = $i.nextInt())) != null) {
-                            values.addAll(flag.arguments);
                             available.removeAll(flag.overrides);
+                            values.addAll(flag.arguments);
+                        } else if (x == 'b') {
+                            available.remove((Object) x);
+                            parsing = false;
                         } else if (x == 'm') {
                             available.clear();
                         } else if (x == '-' && starting) {
@@ -380,8 +389,8 @@ final class Command extends org.bukkit.command.Command {
             if (arg != null) {
                 values.add(arg);
 
-            } else if (i == args.length - 1 || args.length == 0) {
-                final String last = LAST.toLowerCase(Locale.ENGLISH);
+            } else if (0 == args.length || i == args.length - 1) {
+                final String last = (TAB_LOCATION)? LAST.toLowerCase(Locale.ENGLISH) : LAST.toLowerCase();
                 final Map<String, ?> map;
                 try {
                     map = (Map<String, ?>) COMMAND_MAP.invokeExact((CommandMap) COMMANDS.invoke(Bukkit.getServer()));
@@ -393,7 +402,7 @@ final class Command extends org.bukkit.command.Command {
                     values.add(LAST + command.substring(LAST.length()));
                 }
                 Collections.sort(values);
-                if (LAST.length() == 0 && !values.contains("-")) {
+                if (parsing && LAST.length() == 0 && !values.contains("-")) {
                     values.addFirst("-");
                 }
             } else if (i < args.length) {
