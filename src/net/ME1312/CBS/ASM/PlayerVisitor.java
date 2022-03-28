@@ -66,7 +66,7 @@ public final class PlayerVisitor extends TranslationVisitor {
     @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
         if (flip) {
-            if ((access & ACC_STATIC) == 0 && (access & ACC_FINAL) == 0) {
+            if ((access & ACC_PUBLIC) != 0 && (access & ACC_STATIC) == 0 && (access & ACC_FINAL) == 0) {
                 String status = "Merged:     ";
                 if (methods.add(name + descriptor)) {
                     Type method = Type.getMethodType(descriptor);
@@ -153,6 +153,7 @@ public final class PlayerVisitor extends TranslationVisitor {
                             case Type.ARRAY:
                             case Type.OBJECT:
                                 if (!translated) mv.visitInsn(ACONST_NULL);
+                                else if (translation.checkcast(returns)) mv.visitTypeInsn(CHECKCAST, returns.getInternalName());
                                 mv.visitInsn(ARETURN);
                                 break;
                             default:

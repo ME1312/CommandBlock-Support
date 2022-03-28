@@ -22,6 +22,7 @@ public final class EmulatedPlayer /* extends Player */ {
     private static final String CBS = Command.class.getCanonicalName();
     private static final String LOCALE;
     final Set<CommandSender> subs;
+  //private final Unsafe unsafe;
     private final UUID uid;
     private String display;
     private Player player;
@@ -32,6 +33,7 @@ public final class EmulatedPlayer /* extends Player */ {
     EmulatedPlayer(UUID uid) {
         this.name = (this.uid = uid).toString();
         this.subs = new CopyOnWriteArraySet<CommandSender>();
+      //this.unsafe = new Unsafe();
     }
 
     public void $(Player instance) {

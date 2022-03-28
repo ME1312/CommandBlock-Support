@@ -5,6 +5,7 @@ import org.objectweb.asm.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.logging.Logger;
@@ -13,6 +14,7 @@ import static net.ME1312.CBS.ASM.PlayerVisitor.DEBUG;
 import static org.objectweb.asm.Opcodes.*;
 
 class TranslationVisitor extends ClassVisitor {
+    private static final String TRANSLATION = Type.getDescriptor(net.ME1312.CBS.ASM.Translation.class);
     static final String DEBUG_DESC = Type.getDescriptor(SuppressDebugging.class);
     static final String HIDDEN_METHOD = "$";
 
@@ -93,19 +95,52 @@ class TranslationVisitor extends ClassVisitor {
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if ((access & ACC_STATIC) == 0 && (access & ACC_ABSTRACT) == 0 && !name.equals(HIDDEN_METHOD) && Character.isJavaIdentifierStart(name.charAt(0))) {
+        if ((access & ACC_PUBLIC) != 0 && (access & ACC_STATIC) == 0 && (access & ACC_ABSTRACT) == 0 && !name.equals(HIDDEN_METHOD) && Character.isJavaIdentifierStart(name.charAt(0))) {
             return new MethodVisitor(ASM9) {
-                boolean debugging = true;
+                private final ArrayList<String> translations = new ArrayList<>();
+                private boolean debugging = true;
 
                 @Override
                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                    if (visible && descriptor.equals(DEBUG_DESC)) debugging = false;
+                    if (descriptor.equals(DEBUG_DESC)) debugging = false;
+                    if (descriptor.equals(TRANSLATION)) {
+                        final String returns = Type.getReturnType(descriptor).getDescriptor();
+                        return new AnnotationVisitor(ASM9) {
+                            @Override
+                            public AnnotationVisitor visitArray(String key) {
+                                return new AnnotationVisitor(ASM9) {
+                                    @Override
+                                    public AnnotationVisitor visitAnnotation(String key, String descriptor) {
+                                        return new AnnotationVisitor(ASM9) {
+                                            @Override
+                                            public AnnotationVisitor visitArray(String key) {
+                                                return new AnnotationVisitor(ASM9) {
+                                                    private final StringBuilder descriptor = new StringBuilder("(");
+
+                                                    @Override
+                                                    public void visit(String key, Object descriptor) {
+                                                        this.descriptor.append(descriptor);
+                                                    }
+
+                                                    @Override
+                                                    public void visitEnd() {
+                                                        translations.add(descriptor.append(')').append(returns).toString());
+                                                    }
+                                                };
+                                            }
+                                        };
+                                    }
+                                };
+                            }
+                        };
+                    }
                     return null;
                 }
 
                 @Override
                 public void visitEnd() {
-                    translations.compute(identify(name, descriptor), (key, value) -> {
+                    translations.add(descriptor);
+                    for (String descriptor : translations) TranslationVisitor.this.translations.compute(identify(name, descriptor), (key, value) -> {
                         if (value == null) {
                             if (DEBUG) log.info("Found:  " + name + descriptor);
                             return new Translation(name, descriptor, debugging);
@@ -124,11 +159,21 @@ class TranslationVisitor extends ClassVisitor {
     static final class Translation {
         final String name, descriptor;
         final boolean debugging;
+        private Class<?> returns;
 
         public Translation(String name, String descriptor, boolean debugging) {
             this.name = name;
             this.descriptor = descriptor;
             this.debugging = debugging;
+        }
+
+        boolean checkcast(Type type) {
+            try {
+                if (returns == null) returns = Class.forName(Type.getReturnType(descriptor).getClassName());
+                return !Class.forName(type.getClassName()).isAssignableFrom(returns);
+            } catch (ClassNotFoundException e) {
+                return true;
+            }
         }
     }
 }
