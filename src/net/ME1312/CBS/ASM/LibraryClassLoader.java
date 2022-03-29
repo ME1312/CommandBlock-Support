@@ -4,53 +4,54 @@ import java.net.URL;
 import java.net.URLClassLoader;
 
 public final class LibraryClassLoader extends ClassLoader {
-    private ChildURLClassLoader childClassLoader;
+    private final Reload child;
 
-    private static class FindClassClassLoader extends ClassLoader {
-        public FindClassClassLoader(ClassLoader parent) {
-            super(parent);
-        }
-
-        @Override
-        public Class<?> findClass(String name) throws ClassNotFoundException {
-            return super.findClass(name);
-        }
-    }
-
-    private static class ChildURLClassLoader extends URLClassLoader {
-        private FindClassClassLoader realParent;
-
-        public ChildURLClassLoader(URL[] urls, FindClassClassLoader realParent) {
-            super(urls, null);
-            this.realParent = realParent;
-        }
-
-        @Override
-        public Class<?> findClass(String name) throws ClassNotFoundException {
-            try {
-                // first try to use the URLClassLoader findClass
-                return super.findClass(name);
-            } catch (ClassNotFoundException e) {
-                // if that fails, we ask our real parent classloader to load the class (we give up)
-                return realParent.loadClass(name);
-            }
-        }
-    }
-
-    public LibraryClassLoader(ClassLoader parent, URL[] overrides) {
-        super(parent);
-
-        childClassLoader = new ChildURLClassLoader(overrides, new FindClassClassLoader(this.getParent()));
+    public LibraryClassLoader(URL[] urls, String[] overrides) {
+        super(LibraryClassLoader.class.getClassLoader());
+        child = new Reload(urls, overrides, new Wrapper(this.getParent()));
     }
 
     @Override
     protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         try {
-            // first we try to find a class inside the child classloader
-            return childClassLoader.findClass(name);
+            // Search the child classloaders
+            return child.findClass(name);
         } catch(ClassNotFoundException e) {
-            // didn't find it, try the parent
+            // Fallback to the parent classloader
             return super.loadClass(name, resolve);
+        }
+    }
+
+    private static final class Reload extends URLClassLoader {
+        private final String[] whitelist;
+        private final Wrapper next;
+
+        private Reload(URL[] urls, String[] overrides, Wrapper next) {
+            super(urls, null);
+            this.next = next;
+            whitelist = overrides;
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            try {
+                // First, try to load from the URLClassLoader
+                for (String n : whitelist) if (name.startsWith(n)) return super.findClass(name);
+            } catch (ClassNotFoundException e) {}
+
+            // If that fails, we ask our real parent classloader to load the class (we give up)
+            return next.loadClass(name);
+        }
+    }
+
+    private static final class Wrapper extends ClassLoader {
+        private Wrapper(ClassLoader parent) {
+            super(parent);
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            return super.findClass(name);
         }
     }
 }

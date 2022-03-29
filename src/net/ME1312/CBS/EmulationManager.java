@@ -1,52 +1,61 @@
 package net.ME1312.CBS;
 
-import net.ME1312.CBS.ASM.MemoryClassLoader;
-import net.ME1312.CBS.ASM.PlayerVisitor;
+import net.ME1312.CBS.ASM.ASM;
 
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.HashMap;
 import java.util.UUID;
 
-public final class EmulationManager {
+public final class EmulationManager extends JavaPlugin {
     private final HashMap<UUID, EmulatedPlayer> players = new HashMap<UUID, EmulatedPlayer>();
+    private static final RuntimeException reference;
     private final MethodHandle generator;
-    final JavaPlugin plugin;
 
-    public EmulationManager(JavaPlugin plugin, RuntimeException reference) throws Throwable {
-        this.plugin = plugin;
+    static {
+        reference = new RuntimeException();
+        reference.setStackTrace(new StackTraceElement[0]);
+    }
 
-        // Generate extended class
-        byte[] data = new PlayerVisitor().translate(Player.class).flip();
-        if (PlayerVisitor.DEBUG && (plugin.getDataFolder().isDirectory() || plugin.getDataFolder().mkdirs())) {
-            FileOutputStream fos = new FileOutputStream(new File(plugin.getDataFolder(), "EmulatedExtension.class"), false);
-            fos.write(data);
-            fos.close();
+    public EmulationManager() throws Throwable {
+        // noinspection JavaLangInvokeHandleSignature
+        generator = (MethodHandle) MethodHandles.publicLookup().findStatic(
+                ASM.get(getDataFolder(),
+                        "org.objectweb.asm.",
+                        "net.ME1312.CBS.ASM.PlayerVisitor",
+                        "net.ME1312.CBS.ASM.TranslationVisitor"
+                ).loadClass("net.ME1312.CBS.ASM.PlayerVisitor"),
+                "extendAndLoad", MethodType.methodType(MethodHandle.class, new Class[]{ JavaPlugin.class, Class.class })
+        ).invokeExact((JavaPlugin) this, Player.class);
+    }
+
+    @Override
+    public void onEnable() {
+        try {
+            new Command(this, reference);
+            ReferenceFilter.register(reference);
+            new BStats(this, 14759).addCustomChart(new BStats.SingleLineChart("emulators", players::size));
+        } catch (Throwable e) {
+            e.printStackTrace();
+            setEnabled(false);
         }
-        Class<?> extension = new MemoryClassLoader(EmulationManager.class.getClassLoader(), PlayerVisitor.CLASS_NAME, data).loadClass(PlayerVisitor.CLASS_NAME);
-        generator = MethodHandles.publicLookup()
-                .findConstructor(extension, MethodType.methodType(void.class, EmulatedPlayer.class))
-                .asType(MethodType.methodType(void.class, EmulatedPlayer.class));
-
-        new Command(this, extension, reference);
-        new BStats(plugin, 14759).addCustomChart(new BStats.SingleLineChart("emulators", players::size));
     }
 
     EmulatedPlayer getPlayer(UUID uid) {
         return players.computeIfAbsent(uid, key -> {
-            final EmulatedPlayer player = new EmulatedPlayer(key);
             try {
-                generator.invokeExact(player);
+                return (EmulatedPlayer) generator.invokeExact(uid);
             } catch (Throwable e) {
-                e.printStackTrace();
+                throw new RuntimeException(e);
             }
-            return player;
         });
+    }
+
+    public static RuntimeException getQuietException() {
+        return reference;
     }
 }

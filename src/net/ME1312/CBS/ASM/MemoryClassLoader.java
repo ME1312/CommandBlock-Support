@@ -2,7 +2,7 @@ package net.ME1312.CBS.ASM;
 
 public final class MemoryClassLoader extends ClassLoader {
     private final String name;
-    private final byte[] data;
+    private byte[] data;
 
     public MemoryClassLoader(ClassLoader parent, String name, byte[] data) {
         super(parent);
@@ -12,8 +12,11 @@ public final class MemoryClassLoader extends ClassLoader {
 
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        if (this.name.equals(name)) {
+        if (data != null && this.name.equals(name)) try {
             return super.defineClass(name, data, 0, data.length);
-        } else return super.findClass(name);
+        } finally {
+            data = null;
+        }
+        return super.findClass(name);
     }
 }

@@ -7,16 +7,25 @@ import java.lang.annotation.*;
 @Target(ElementType.METHOD)
 public @interface Translation {
 
-    // Use this in EmulatedPlayer to specify additional translations provided by the @annotated method
-    For[] value();
+    // Use this to specify a different method name
+    String name() default "";
+
+    // Use this to specify different method parameters
+    // The amount and position of parameters in the translation must be the same as those in the @annotated method
+    Class<?>[] params() default {};
+
+
+    // Use this to specify multiple additional translation mappings
+    // To preserve code clarity, this should not be combined with the fields above
+    For[] value() default {};
 
     @Documented
     @Retention(RetentionPolicy.CLASS)
     @Target(ElementType.ANNOTATION_TYPE)
     @interface For {
 
-        // Use this to specify the actual method parameters
-        // The amount and position of parameters in the translation must be the same as the @annotated method
-        Class<?>[] value() default {};
+        // These function the same as the fields above
+        String name() default "";
+        Class<?>[] params() default {};
     }
 }

@@ -3,14 +3,21 @@ package net.ME1312.CBS.ASM;
 import net.ME1312.CBS.EmulatedPlayer;
 
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.UUID;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -20,8 +27,7 @@ public final class PlayerVisitor extends TranslationVisitor {
     public static final int CLASS_VERSION = V1_8;
 
     private static final String EMU_PATH = Type.getInternalName(EmulatedPlayer.class);
-    private static final String EMU_DESC = Type.getDescriptor(EmulatedPlayer.class);
-    private static final String EMU_FIELD = "$";
+    private static final String EMU_METHOD = "$";
 
     public static final boolean DEBUG = Boolean.getBoolean("cbs.debug");
     private static final String DEBUG_FIELD = "debug";
@@ -37,24 +43,32 @@ public final class PlayerVisitor extends TranslationVisitor {
         stage = "implementable methods";
         flip = true;
         cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        cv.visit(CLASS_VERSION, ACC_PUBLIC | ACC_FINAL, CLASS_PATH, null, "java/lang/Object", new String[] { Type.getInternalName(Player.class) });
-        cv.visitField(ACC_PRIVATE | ACC_FINAL, EMU_FIELD, EMU_DESC, null, null);
-        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(EmulatedPlayer.class)), null, null);
+        cv.visit(CLASS_VERSION, ACC_PUBLIC | ACC_FINAL, CLASS_PATH, null, EMU_PATH, new String[] { Type.getInternalName(Player.class) });
+        String constructor = Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(UUID.class));
+        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", constructor, null, null);
         mv.visitLabel(new Label());
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitInsn(DUP);
-        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", Type.getMethodDescriptor(Type.VOID_TYPE), false);
-        mv.visitInsn(DUP);
         mv.visitVarInsn(ALOAD, 1);
-        mv.visitInsn(DUP_X2);
-        mv.visitFieldInsn(PUTFIELD, CLASS_PATH, EMU_FIELD, EMU_DESC);
-        mv.visitMethodInsn(INVOKEVIRTUAL, EMU_PATH, HIDDEN_METHOD, '(' + Type.getDescriptor(Player.class) + ")V", false);
+        mv.visitMethodInsn(INVOKESPECIAL, EMU_PATH, "<init>", constructor, false);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
-    public PlayerVisitor translate(Class<?> clazz) throws IOException {
+    public static MethodHandle extendAndLoad(JavaPlugin plugin, Class<?> clazz) throws Throwable {
+        byte[] data = new PlayerVisitor().extend(clazz).flip();
+        if (DEBUG && (plugin.getDataFolder().isDirectory() || plugin.getDataFolder().mkdirs())) {
+            FileOutputStream fos = new FileOutputStream(new File(plugin.getDataFolder(), "EmulatedExtension.class"), false);
+            fos.write(data);
+            fos.close();
+        }
+        return MethodHandles.publicLookup().findConstructor(
+                new MemoryClassLoader(plugin.getClass().getClassLoader(), CLASS_NAME, data).loadClass(CLASS_NAME),
+                MethodType.methodType(void.class, UUID.class)
+        ).asType(MethodType.methodType(EmulatedPlayer.class, UUID.class));
+    }
+
+    public PlayerVisitor extend(Class<?> clazz) throws IOException {
         scan(clazz);
         return this;
     }
@@ -67,97 +81,107 @@ public final class PlayerVisitor extends TranslationVisitor {
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
         if (flip) {
             if ((access & ACC_PUBLIC) != 0 && (access & ACC_STATIC) == 0 && (access & ACC_FINAL) == 0) {
-                String status = "Merged:     ";
+                String status = "Merged:      ";
                 if (methods.add(name + descriptor)) {
-                    Type method = Type.getMethodType(descriptor);
-                    Type returns = method.getReturnType();
-                    Type[] params = method.getArgumentTypes();
-                    Translation translation = translations.get(identify(name, descriptor));
+                    final Translation translation = translations.get(identify(name, descriptor));
                     final boolean translated = translation != null;
-                    final int length = params.length;
-                    status = "Skipped:    ";
+                    status = "Skipped:     ";
 
-                    // Insert debugging method
-                    if (translated || (access & ACC_ABSTRACT) != 0) {
+                    if (translated && !translation.debug && translation.special == null && translation.desc.equals(descriptor)) {
+                        // The method signatures and functionality are identical, so calls can be handled directly by the superclass
+                        status = "@Redirected: ";
+
+                    } else if (translated || (access & ACC_ABSTRACT) != 0) {
+                        final Type method = Type.getMethodType(descriptor);
+                        final Type returns = method.getReturnType();
+
                         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, name, descriptor, signature, exceptions);
                         mv.visitLabel(new Label());
-                        mv.visitVarInsn(ALOAD, 0);
-                        mv.visitFieldInsn(GETFIELD, CLASS_PATH, EMU_FIELD, EMU_DESC);
-                        if (!translated || translation.debugging) {
-                            if (translated) mv.visitInsn(DUP);
-                            mv.visitFieldInsn(GETFIELD, EMU_PATH, DEBUG_FIELD, "Z");
-                            Label orElse = new Label();
-                            mv.visitJumpInsn(IFEQ, orElse);
-                            if (translated) {
-                                mv.visitInsn(DUP);
-                            } else {
-                                mv.visitVarInsn(ALOAD, 0);
-                                mv.visitFieldInsn(GETFIELD, CLASS_PATH, EMU_FIELD, EMU_DESC);
-                            }
-                            mv.visitInsn((translated)? ICONST_1 : ICONST_0);
-                            xldc(mv, returns);
-                            xpush(mv, length);
-                            mv.visitTypeInsn(ANEWARRAY, Type.getInternalName(Class.class));
-                            for (int i = 0; i < length; ++i) {
-                                mv.visitInsn(DUP);
-                                xpush(mv, i);
-                                xldc(mv, params[i]);
-                                mv.visitInsn(AASTORE);
-                            }
-                            xpush(mv, length);
-                            mv.visitTypeInsn(ANEWARRAY, Type.getInternalName(Object.class));
-                            for (int a = 1, i = 0; i < length; ++i) {
-                                mv.visitInsn(DUP);
-                                xpush(mv, i);
-                                a += xload(mv, params[i], a, true);
-                                mv.visitInsn(AASTORE);
-                            }
-                            mv.visitMethodInsn(INVOKEVIRTUAL, EMU_PATH, HIDDEN_METHOD, "(ZLjava/lang/Class;[Ljava/lang/Class;[Ljava/lang/Object;)V", false);
-                            mv.visitLabel(orElse);
-                        }
-
-                        // Handle method translation
-                        if (translated) {
-                            for (int a = 1, i = 0; i < length; ++i) {
-                                a += xload(mv, params[i], a, false);
-                            }
-                            mv.visitMethodInsn(INVOKEVIRTUAL, EMU_PATH, name, translation.descriptor, false);
-                            status = "Translated: ";
+                        if (translated && translation.special != null) {
+                            // This translation uses special pre-prepared bytecode instructions
+                            translation.special.accept(mv, returns);
+                            status = "Implemented: ";
                         } else {
-                            status = "Defaulted:  ";
-                        }
-                        switch (returns.getSort()) {
-                            case Type.VOID:
-                                mv.visitInsn(RETURN);
-                                break;
-                            case Type.BOOLEAN:
-                            case Type.CHAR:
-                            case Type.BYTE:
-                            case Type.SHORT:
-                            case Type.INT:
-                                if (!translated) mv.visitInsn(ICONST_0);
-                                mv.visitInsn(IRETURN);
-                                break;
-                            case Type.FLOAT:
-                                if (!translated) mv.visitInsn(FCONST_0);
-                                mv.visitInsn(FRETURN);
-                                break;
-                            case Type.LONG:
-                                if (!translated) mv.visitInsn(LCONST_0);
-                                mv.visitInsn(LRETURN);
-                                break;
-                            case Type.DOUBLE:
-                                if (!translated) mv.visitInsn(DCONST_0);
-                                mv.visitInsn(DRETURN);
-                                break;
-                            case Type.ARRAY:
-                            case Type.OBJECT:
-                                if (!translated) mv.visitInsn(ACONST_NULL);
-                                else if (translation.checkcast(returns)) mv.visitTypeInsn(CHECKCAST, returns.getInternalName());
-                                mv.visitInsn(ARETURN);
-                                break;
-                            default:
-                                throw new AssertionError();
+                            final Type[] params = method.getArgumentTypes();
+                            final int length = params.length;
+
+                            // Installs code for method debugging (unless @suppressed)
+                            mv.visitVarInsn(ALOAD, 0);
+                            if (!translated || translation.debug) {
+                                if (translated) mv.visitInsn(DUP);
+                                mv.visitFieldInsn(GETFIELD, EMU_PATH, DEBUG_FIELD, "Z");
+                                Label orElse = new Label();
+                                mv.visitJumpInsn(IFEQ, orElse);
+                                if (translated) {
+                                    mv.visitInsn(DUP);
+                                } else {
+                                    mv.visitVarInsn(ALOAD, 0);
+                                }
+                                mv.visitInsn((translated)? ICONST_1 : ICONST_0);
+                                xldc(mv, returns);
+                                xpush(mv, length);
+                                mv.visitTypeInsn(ANEWARRAY, Type.getInternalName(Class.class));
+                                for (int i = 0; i < length; ++i) {
+                                    mv.visitInsn(DUP);
+                                    xpush(mv, i);
+                                    xldc(mv, params[i]);
+                                    mv.visitInsn(AASTORE);
+                                }
+                                xpush(mv, length);
+                                mv.visitTypeInsn(ANEWARRAY, Type.getInternalName(Object.class));
+                                for (int a = 1, i = 0; i < length; ++i) {
+                                    mv.visitInsn(DUP);
+                                    xpush(mv, i);
+                                    a += xload(mv, params[i], a, true);
+                                    mv.visitInsn(AASTORE);
+                                }
+                                mv.visitMethodInsn(INVOKESPECIAL, EMU_PATH, EMU_METHOD, "(ZLjava/lang/Class;[Ljava/lang/Class;[Ljava/lang/Object;)V", false);
+                                mv.visitLabel(orElse);
+                            }
+
+                            // Handles method translation
+                            if (translated) {
+                                for (int a = 1, i = 0; i < length; ++i) {
+                                    a += xload(mv, params[i], a, false);
+                                }
+                                mv.visitMethodInsn(INVOKESPECIAL, EMU_PATH, translation.name, translation.desc, false);
+                                status = (translation.debug)? "Translated:  " : "@Translated: ";
+                            } else {
+                                status = "Defaulted:   ";
+                            }
+                            switch (returns.getSort()) {
+                                case Type.VOID:
+                                    mv.visitInsn(RETURN);
+                                    break;
+                                case Type.BOOLEAN:
+                                case Type.CHAR:
+                                case Type.BYTE:
+                                case Type.SHORT:
+                                case Type.INT:
+                                    if (!translated) mv.visitInsn(ICONST_0);
+                                    mv.visitInsn(IRETURN);
+                                    break;
+                                case Type.FLOAT:
+                                    if (!translated) mv.visitInsn(FCONST_0);
+                                    mv.visitInsn(FRETURN);
+                                    break;
+                                case Type.LONG:
+                                    if (!translated) mv.visitInsn(LCONST_0);
+                                    mv.visitInsn(LRETURN);
+                                    break;
+                                case Type.DOUBLE:
+                                    if (!translated) mv.visitInsn(DCONST_0);
+                                    mv.visitInsn(DRETURN);
+                                    break;
+                                case Type.ARRAY:
+                                case Type.OBJECT:
+                                    if (!translated) mv.visitInsn(ACONST_NULL);
+                                    else if (translation.checkcast(returns)) mv.visitTypeInsn(CHECKCAST, returns.getInternalName());
+                                    mv.visitInsn(ARETURN);
+                                    break;
+                                default:
+                                    throw new AssertionError();
+                            }
                         }
                         mv.visitMaxs(0, 0);
                         mv.visitEnd();

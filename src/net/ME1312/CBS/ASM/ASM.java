@@ -1,6 +1,6 @@
 package net.ME1312.CBS.ASM;
 
-import net.ME1312.CBS.CBS;
+import net.ME1312.CBS.EmulationManager;
 
 import com.google.common.io.Resources;
 import org.bukkit.Bukkit;
@@ -18,11 +18,11 @@ public final class ASM {
     private static final String ASM_VERSION = "9.2";
     private static final String ASM_DOWNLOAD = "https://repo.maven.apache.org/maven2/org/ow2/asm/$1/" + ASM_VERSION + "/$1-" + ASM_VERSION + ".jar";
 
-    public static ClassLoader get(File dir) {
+    public static ClassLoader get(File dir, String... with) {
         if (ASM == null) {
             try {
                 Class.forName("org.objectweb.asm.Opcodes").getField("ASM9").getInt(null);
-                ASM = CBS.class.getClassLoader();
+                ASM = EmulationManager.class.getClassLoader();
             } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchFieldException | NoSuchFieldError | IllegalAccessException x) {
                 boolean announced = false;
                 dir.mkdirs();
@@ -41,7 +41,7 @@ public final class ASM {
                 if (asm.exists()) {
                     if (announced) log.info(">> ASM download complete");
                     try {
-                        ASM = new LibraryClassLoader(CBS.class.getClassLoader(), new URL[]{CBS.class.getProtectionDomain().getCodeSource().getLocation(), asm.toURI().toURL()});
+                        ASM = new LibraryClassLoader(new URL[]{EmulationManager.class.getProtectionDomain().getCodeSource().getLocation(), asm.toURI().toURL()}, with);
                     } catch (Throwable e) {
                         log.log(Level.SEVERE, ">> Could not load ASM:", e);
                     }

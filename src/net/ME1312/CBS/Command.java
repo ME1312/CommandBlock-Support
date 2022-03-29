@@ -28,10 +28,9 @@ final class Command extends org.bukkit.command.Command {
     private final RuntimeException FAILURE;
     private final MethodHandle COMMAND_MAP;
     private final MethodHandle COMMANDS;
-    private final Class<?> CBS;
     private final boolean FLAT;
     private final EmulationManager plugin;
-    Command(EmulationManager plugin, Class<?> extension, RuntimeException reference) throws Throwable {
+    Command(EmulationManager plugin, RuntimeException reference) throws Throwable {
         super("cbs", "CommandBlock Support", "/cbs [-flags] [command] [args...]", Collections.emptyList());
         this.plugin = plugin;
         boolean flat;
@@ -40,7 +39,6 @@ final class Command extends org.bukkit.command.Command {
         } catch (NoSuchMethodException | NoSuchMethodError e) {
             flat = false;
         }
-        CBS = extension;
         FLAT = flat;
         Server server = Bukkit.getServer();
         Class<?> clazz = server.getClass();
@@ -68,7 +66,7 @@ final class Command extends org.bukkit.command.Command {
     @SuppressWarnings("NullableProblems")
     public boolean execute(CommandSender sender, String label, String[] args) {
         if (args.length == 0) {
-            PluginDescriptionFile desc = plugin.plugin.getDescription();
+            PluginDescriptionFile desc = plugin.getDescription();
             sender.sendMessage("");
             sender.sendMessage(prefix(GRAY, DARK_GRAY) + "You are using " + WHITE + "CommandBlock Support" + GRAY + " version " + WHITE + desc.getVersion());
             sender.sendMessage(DARK_GRAY + " ---" + BOLD + '\u00BB' + WHITE + " /" + label + " [-flags] [command] [args...]");
@@ -81,7 +79,7 @@ final class Command extends org.bukkit.command.Command {
                     if (sender instanceof BlockCommandSender) {
                         throw FAILURE;
                     } else {
-                        return sender.getClass() != CBS;
+                        return !(sender instanceof EmulatedPlayer);
                     }
                 }
             } else {
@@ -96,7 +94,7 @@ final class Command extends org.bukkit.command.Command {
             UUID uid = null;
 
             if (sender instanceof Player) {
-                if (sender.getClass() == CBS) {
+                if (sender instanceof EmulatedPlayer) {
                     sender.sendMessage(prefix(RED, DARK_RED) + "This command cannot be nested");
                     return false;
                 } else if (!sender.isOp()) {

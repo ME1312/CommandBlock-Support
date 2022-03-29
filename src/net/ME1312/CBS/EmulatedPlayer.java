@@ -18,30 +18,24 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 
 @SuppressWarnings({"NullableProblems", "unused"})
-public final class EmulatedPlayer /* extends Player */ {
+public abstract class EmulatedPlayer /* extends Player */ {
     private static final String CBS = Command.class.getCanonicalName();
     private static final String LOCALE;
     final Set<CommandSender> subs;
   //private final Unsafe unsafe;
+    protected boolean debug;
     private final UUID uid;
     private String display;
-    private Player player;
-    public boolean debug;
     Location pos;
     String name;
 
-    EmulatedPlayer(UUID uid) {
+    protected EmulatedPlayer(UUID uid) {
         this.name = (this.uid = uid).toString();
         this.subs = new CopyOnWriteArraySet<CommandSender>();
       //this.unsafe = new Unsafe();
     }
 
-    public void $(Player instance) {
-        if (player != null) throw new IllegalStateException("Emulator already initialized!");
-        this.player = instance;
-    }
-
-    public void $(boolean translated, Class<?> returns, Class<?>[] params, Object[] args) {
+    protected final void $(boolean translated, Class<?> returns, Class<?>[] params, Object[] args) {
         StackTraceElement[] stack = new Throwable().getStackTrace();
         if (stack.length > 3) {
             String uid = this.uid.toString();
@@ -171,15 +165,9 @@ public final class EmulatedPlayer /* extends Player */ {
         }
     }
 
-    @SuppressDebugging
-    public Server getServer() {
-        return Bukkit.getServer();
-    }
+    public abstract Server getServer();
 
-    @SuppressDebugging
-    public Player getPlayer() {
-        return player;
-    }
+    public abstract Player getPlayer();
 
     public UUID getUniqueId() {
         return uid;

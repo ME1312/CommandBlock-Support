@@ -1,5 +1,5 @@
 name: CommandBlock-Support
-main: net.ME1312.CBS.CBS
+main: net.ME1312.CBS.EmulationManager
 version: "1.18.2a"
 authors: ["ME1312"]
 website: "https://github.com/ME1312/CommandBlock-Support"

@@ -2,7 +2,7 @@ package net.ME1312.CBS;
 
 import java.util.function.Supplier;
 
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "unused"})
 final class Unsafe {
     // This class isn't used at the moment, but one would use it to store and load types that didn't exist in 1.7.10
     // This text will be replaced by static constants for the magic number accessors once we start using it
