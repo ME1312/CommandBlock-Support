@@ -23,8 +23,8 @@ class TranslationVisitor extends ClassVisitor {
 
     final HashMap<String, Translation> translations = new HashMap<>();
     final HashSet<String> classes = new HashSet<>();
+    boolean flip, spaced;
     final Logger log;
-    boolean spaced;
     String stage;
     public TranslationVisitor() {
         super(ASM9);

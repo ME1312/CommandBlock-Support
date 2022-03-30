@@ -213,14 +213,6 @@ public abstract class EmulatedPlayer /* extends Player */ {
         return GameMode.CREATIVE;
     }
 
-    public double getEyeHeight() {
-        return 0;
-    }
-
-    public double getEyeHeight(boolean b) {
-        return 0;
-    }
-
     public Location getEyeLocation() {
         return pos;
     }

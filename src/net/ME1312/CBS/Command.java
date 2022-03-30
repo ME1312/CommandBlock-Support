@@ -1,6 +1,9 @@
 package net.ME1312.CBS;
 
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Directional;
@@ -12,51 +15,20 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.util.Vector;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodHandles.Lookup;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static net.ME1312.CBS.EmulationManager.*;
 import static org.bukkit.ChatColor.*;
 
 final class Command extends org.bukkit.command.Command {
-    private static final Map<Integer, Flag> FLAGS;
-    private static final boolean TAB_LOCATION;
-    private final RuntimeException FAILURE;
-    private final MethodHandle COMMAND_MAP;
-    private final MethodHandle COMMANDS;
-    private final boolean FLAT;
+    private static final Map<Integer, Flag> flags;
+    private static final boolean location;
+    private static final boolean flat;
     private final EmulationManager plugin;
-    Command(EmulationManager plugin, RuntimeException reference) throws Throwable {
+    Command(EmulationManager plugin) {
         super("cbs", "CommandBlock Support", "/cbs [-flags] [command] [args...]", Collections.emptyList());
         this.plugin = plugin;
-        boolean flat;
-        try { // noinspection ConstantConditions
-            flat = Block.class.getMethod("getBlockData") != null;
-        } catch (NoSuchMethodException | NoSuchMethodError e) {
-            flat = false;
-        }
-        FLAT = flat;
-        Server server = Bukkit.getServer();
-        Class<?> clazz = server.getClass();
-        Lookup lookup = MethodHandles.lookup();
-        Field field = clazz.getDeclaredField("commandMap"); field.setAccessible(true);
-        ((CommandMap) (COMMANDS = lookup.unreflectGetter(field).asType(MethodType.methodType(CommandMap.class, Server.class))).invokeExact(server)).register("cbs", this);
-
-        clazz = field.getType();
-        MethodHandle handle;
-        for (;;) try {
-            field = clazz.getDeclaredField("knownCommands"); field.setAccessible(true);
-            handle = lookup.unreflectGetter(field).asType(MethodType.methodType(Map.class, CommandMap.class));
-            break;
-        } catch (NoSuchFieldException e) {
-            if ((clazz = clazz.getSuperclass()) == null) throw e;
-        }
-        COMMAND_MAP = handle;
-        FAILURE = reference;
     }
 
     private String prefix(ChatColor color, ChatColor accent) {
@@ -77,7 +49,7 @@ final class Command extends org.bukkit.command.Command {
             if (args.length != 1) { // Minimal mode (-m) has the sender run the command as themselves. No further permission checks required.
                 if (!run(sender, sender, args, 1)) {
                     if (sender instanceof BlockCommandSender) {
-                        throw FAILURE;
+                        throw reference;
                     } else {
                         return !(sender instanceof EmulatedPlayer);
                     }
@@ -115,7 +87,7 @@ final class Command extends org.bukkit.command.Command {
                 x = block.getX();
                 y = block.getY();
                 z = block.getZ();
-                if (FLAT) {
+                if (flat) {
                     BlockFace mod = ((Directional) block.getBlockData()).getFacing();
                     yaw = (float) (-Math.atan2(mod.getModX(), mod.getModZ()) / Math.PI * 180.0);
                     pitch = (float) (Math.asin(mod.getModY() / new Vector(mod.getModX(), mod.getModY(), mod.getModZ()).length()) * 180.0 / Math.PI);
@@ -215,7 +187,7 @@ final class Command extends org.bukkit.command.Command {
                                 throw new CommandException("The " + DARK_RED + "-m" + RED + " flag cannot be combined with any other flags");
                             }
                             case ';': {
-                                throw FAILURE;
+                                throw reference;
                             }
                             case '-': if (starting) {
                                 continue;
@@ -228,11 +200,11 @@ final class Command extends org.bukkit.command.Command {
                     }
                 }
             } catch (CommandException e) {
-                if (sender instanceof BlockCommandSender) throw FAILURE;
+                if (sender instanceof BlockCommandSender) throw reference;
                 sender.sendMessage(prefix(RED, DARK_RED) + e.getMessage());
                 return true;
             } catch (RuntimeException e) {
-                if (e != FAILURE) throw e;
+                if (e != reference) throw e;
                 ++i;
             }
 
@@ -250,7 +222,7 @@ final class Command extends org.bukkit.command.Command {
                     if (execute || sub) player.subs.add(sender);
                     if (execute) {
                         if (!run(sender, player.getPlayer(), args, i) && sender instanceof BlockCommandSender) {
-                            throw FAILURE;
+                            throw reference;
                         }
                     } else {
                         sender.sendMessage(prefix(YELLOW, GOLD) + "Instance flags updated " + GOLD + '\u25CF' + YELLOW + " No command to execute");
@@ -267,9 +239,9 @@ final class Command extends org.bukkit.command.Command {
         org.bukkit.command.Command command;
         String label = args[i];
         try {
-            command = ((CommandMap) COMMANDS.invoke(Bukkit.getServer())).getCommand(label);
+            command = ((CommandMap) commands.invokeExact(Bukkit.getServer())).getCommand(label);
         } catch (Throwable e) {
-            throw new RuntimeException(e);
+            throw Unsafe.rethrow(e);
         }
 
         if (command == null) {
@@ -301,25 +273,33 @@ final class Command extends org.bukkit.command.Command {
     }
 
     static {
-        Map<Integer, Flag> flags = new LinkedHashMap<Integer, Flag>();
-        flags.compute((int) 'd', (c, v) -> new Flag(Collections.emptyList(), c));
-        flags.compute((int) 's', (c, v) -> new Flag(Collections.emptyList(), c));
-        flags.compute((int) 'n', (c, v) -> new Flag(Collections.singletonList("<username>"), c));
-        flags.compute((int) 'u', (c, v) -> new Flag(Collections.singletonList("<uuid>"), c));
-        flags.compute((int) 'w', (c, v) -> new Flag(Collections.singletonList("<world>"), c));
-        flags.compute((int) 'x', (c, v) -> new Flag(Collections.singletonList("<x>"), c, 'v'));
-        flags.compute((int) 'y', (c, v) -> new Flag(Collections.singletonList("<y>"), c, 'v'));
-        flags.compute((int) 'z', (c, v) -> new Flag(Collections.singletonList("<z>"), c, 'v'));
-        flags.compute((int) 'v', (c, v) -> new Flag(Arrays.asList("<x>", "<y>", "<z>"), c, 'x', 'y', 'z'));
-        flags.compute((int) 'c', (c, v) -> new Flag(Arrays.asList("<yaw>", "<pitch>"), c));
-        FLAGS = Collections.unmodifiableMap(flags);
-        boolean location;
+        Map<Integer, Flag> map = new LinkedHashMap<Integer, Flag>();
+        map.compute((int) 'd', (c, v) -> new Flag(Collections.emptyList(), c));
+        map.compute((int) 's', (c, v) -> new Flag(Collections.emptyList(), c));
+        map.compute((int) 'n', (c, v) -> new Flag(Collections.singletonList("<username>"), c));
+        map.compute((int) 'u', (c, v) -> new Flag(Collections.singletonList("<uuid>"), c));
+        map.compute((int) 'w', (c, v) -> new Flag(Collections.singletonList("<world>"), c));
+        map.compute((int) 'x', (c, v) -> new Flag(Collections.singletonList("<x>"), c, 'v'));
+        map.compute((int) 'y', (c, v) -> new Flag(Collections.singletonList("<y>"), c, 'v'));
+        map.compute((int) 'z', (c, v) -> new Flag(Collections.singletonList("<z>"), c, 'v'));
+        map.compute((int) 'v', (c, v) -> new Flag(Arrays.asList("<x>", "<y>", "<z>"), c, 'x', 'y', 'z'));
+        map.compute((int) 'c', (c, v) -> new Flag(Arrays.asList("<yaw>", "<pitch>"), c));
+        flags = Collections.unmodifiableMap(map);
+
+        boolean value;
         try { // noinspection ConstantConditions
-            location = org.bukkit.command.Command.class.getMethod("tabComplete", CommandSender.class, String.class, String[].class, Location.class) != null;
-        } catch (NoSuchMethodException e) {
-            location = false;
+            value = Block.class.getMethod("getBlockData") != null;
+        } catch (NoSuchMethodException | NoSuchMethodError e) {
+            value = false;
         }
-        TAB_LOCATION = location;
+        flat = value;
+
+        try { // noinspection ConstantConditions
+            value = org.bukkit.command.Command.class.getMethod("tabComplete", CommandSender.class, String.class, String[].class, Location.class) != null;
+        } catch (NoSuchMethodException e) {
+            value = false;
+        }
+        location = value;
     }
 
     private static final class Flag {
@@ -339,7 +319,7 @@ final class Command extends org.bukkit.command.Command {
     @SuppressWarnings("unchecked")
     public List<String> tabComplete(CommandSender sender, String label, String[] args, Location location) throws IllegalArgumentException {
         if (sender.isOp()) {
-            final LinkedList<Integer> available = new LinkedList<Integer>(FLAGS.keySet());
+            final LinkedList<Integer> available = new LinkedList<Integer>(flags.keySet());
             final LinkedList<String> values = new LinkedList<String>();
             final String LAST = (args.length > 0)?args[args.length - 1]:"";
             available.addFirst((int) ';');
@@ -353,13 +333,13 @@ final class Command extends org.bukkit.command.Command {
                 boolean starting = true;
                 for (int x; parsing && args[i].startsWith("-"); i = x, starting = true) {
                     for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) try {
-                        if ((flag = FLAGS.get(x = $i.nextInt())) != null) {
+                        if ((flag = flags.get(x = $i.nextInt())) != null) {
                             values.addAll(flag.arguments);
                             available.removeAll(flag.overrides);
                         } else if (x == 'm') {
                             available.clear();
                         } else if (x == ';') {
-                            throw FAILURE;
+                            throw reference;
                         } else if (x == '-' && starting) {
                             continue;
                         }
@@ -369,7 +349,7 @@ final class Command extends org.bukkit.command.Command {
                             starting = false;
                         }
                     } catch (RuntimeException e) {
-                        if (e != FAILURE) throw e;
+                        if (e != reference) throw e;
                         available.clear();
                         parsing = false;
                         break;
@@ -393,12 +373,12 @@ final class Command extends org.bukkit.command.Command {
                 values.add(arg);
 
             } else if (0 == args.length || i == args.length - 1) {
-                final String last = (TAB_LOCATION)? LAST.toLowerCase(Locale.ENGLISH) : LAST.toLowerCase();
+                final String last = (Command.location)? LAST.toLowerCase(Locale.ENGLISH) : LAST.toLowerCase();
                 final Map<String, ?> map;
                 try {
-                    map = (Map<String, ?>) COMMAND_MAP.invokeExact((CommandMap) COMMANDS.invoke(Bukkit.getServer()));
+                    map = (Map<String, ?>) mappings.invokeExact((CommandMap) commands.invoke(Bukkit.getServer()));
                 } catch (Throwable e) {
-                    throw new RuntimeException(e);
+                    throw Unsafe.rethrow(e);
                 }
 
                 for (String command : map.keySet()) if (command.startsWith(last)) {
@@ -411,13 +391,13 @@ final class Command extends org.bukkit.command.Command {
             } else if (i < args.length) {
                 org.bukkit.command.Command command;
                 try {
-                    command = ((CommandMap) COMMANDS.invoke(Bukkit.getServer())).getCommand(args[i]);
+                    command = ((CommandMap) commands.invoke(Bukkit.getServer())).getCommand(args[i]);
                 } catch (Throwable e) {
-                    throw new RuntimeException(e);
+                    throw Unsafe.rethrow(e);
                 }
 
                 if (command != null) {
-                    if (TAB_LOCATION) {
+                    if (Command.location) {
                         return command.tabComplete(sender, args[i], Arrays.copyOfRange(args, ++i, args.length), location);
                     } else {
                         return command.tabComplete(sender, args[i], Arrays.copyOfRange(args, ++i, args.length));

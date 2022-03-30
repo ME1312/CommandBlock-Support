@@ -3,7 +3,7 @@ package net.ME1312.CBS.ASM;
 import net.ME1312.CBS.EmulatedPlayer;
 
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.Plugin;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -34,14 +34,11 @@ public final class PlayerVisitor extends TranslationVisitor {
 
     private final HashSet<String> methods;
     private final ClassWriter cv;
-    private boolean flip;
     public PlayerVisitor() throws IOException {
-        flip = false;
         scan(EmulatedPlayer.class);
         classes.clear();
         methods = new HashSet<>();
-        stage = "implementable methods";
-        flip = true;
+        stage = "implementable methods"; flip = true;
         cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         cv.visit(CLASS_VERSION, ACC_PUBLIC | ACC_FINAL, CLASS_PATH, null, EMU_PATH, new String[] { Type.getInternalName(Player.class) });
         String constructor = Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(UUID.class));
@@ -53,10 +50,11 @@ public final class PlayerVisitor extends TranslationVisitor {
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+        scan(Player.class);
     }
 
-    public static MethodHandle extendAndLoad(JavaPlugin plugin, Class<?> clazz) throws Throwable {
-        byte[] data = new PlayerVisitor().extend(clazz).flip();
+    public static MethodHandle generateExtension(Plugin plugin) throws Throwable {
+        byte[] data = new PlayerVisitor().export();
         if (DEBUG && (plugin.getDataFolder().isDirectory() || plugin.getDataFolder().mkdirs())) {
             FileOutputStream fos = new FileOutputStream(new File(plugin.getDataFolder(), "EmulatedExtension.class"), false);
             fos.write(data);
@@ -68,12 +66,7 @@ public final class PlayerVisitor extends TranslationVisitor {
         ).asType(MethodType.methodType(EmulatedPlayer.class, UUID.class));
     }
 
-    public PlayerVisitor extend(Class<?> clazz) throws IOException {
-        scan(clazz);
-        return this;
-    }
-
-    public byte[] flip() {
+    public byte[] export() {
         return cv.toByteArray();
     }
 

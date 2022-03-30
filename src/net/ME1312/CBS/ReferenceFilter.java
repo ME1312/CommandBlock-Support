@@ -5,17 +5,16 @@ import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.filter.AbstractFilter;
 
+import static net.ME1312.CBS.EmulationManager.reference;
 import static org.apache.logging.log4j.core.Filter.Result.DENY;
 import static org.apache.logging.log4j.core.Filter.Result.NEUTRAL;
 
 final class ReferenceFilter extends AbstractFilter {
     private static boolean registered = false;
-    private static RuntimeException filtered;
 
-    static void register(RuntimeException reference) {
+    static void register() {
         if (!registered) {
             registered = true;
-            filtered = reference;
             ((Logger) LogManager.getRootLogger()).addFilter(new ReferenceFilter());
         }
     }
@@ -28,7 +27,7 @@ final class ReferenceFilter extends AbstractFilter {
     @Override
     public Result filter(LogEvent event) {
         for (Throwable type = event.getThrown(); type != null; type = type.getCause()) {
-            if (type == filtered) return DENY;
+            if (type == reference) return DENY;
         }
         return NEUTRAL;
     }
