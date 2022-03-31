@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.UUID;
@@ -23,14 +24,13 @@ import static org.objectweb.asm.Opcodes.*;
 
 public final class PlayerVisitor extends TranslationVisitor {
     public static final String CLASS_PATH = "net/ME1312/CBS/EmulatedExtension";
-    public static final String CLASS_NAME = CLASS_PATH.replace('/', '.');
+    public static final String CLASS_NAME = "net.ME1312.CBS.EmulatedExtension";
     public static final int CLASS_VERSION = V1_8;
 
-    private static final String EMU_PATH = Type.getInternalName(EmulatedPlayer.class);
-    private static final String EMU_METHOD = "$";
-
+    private static final String EMU_PATH = "net/ME1312/CBS/EmulatedPlayer";
     public static final boolean DEBUG = Boolean.getBoolean("cbs.debug");
     private static final String DEBUG_FIELD = "debug";
+    private static final String DEBUG_METHOD = "$";
 
     private final HashSet<String> methods;
     private final ClassWriter cv;
@@ -40,9 +40,9 @@ public final class PlayerVisitor extends TranslationVisitor {
         methods = new HashSet<>();
         stage = "implementable methods"; flip = true;
         cv = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        cv.visit(CLASS_VERSION, ACC_PUBLIC | ACC_FINAL, CLASS_PATH, null, EMU_PATH, new String[] { Type.getInternalName(Player.class) });
+        cv.visit(CLASS_VERSION, ACC_FINAL | ACC_SUPER | ACC_SYNTHETIC, CLASS_PATH, null, EMU_PATH, new String[] { "org/bukkit/entity/Player" });
         String constructor = Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(UUID.class));
-        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC, "<init>", constructor, null, null);
+        MethodVisitor mv = cv.visitMethod(ACC_PRIVATE, "<init>", constructor, null, null);
         mv.visitLabel(new Label());
         mv.visitVarInsn(ALOAD, 0);
         mv.visitVarInsn(ALOAD, 1);
@@ -60,10 +60,9 @@ public final class PlayerVisitor extends TranslationVisitor {
             fos.write(data);
             fos.close();
         }
-        return MethodHandles.publicLookup().findConstructor(
-                new MemoryClassLoader(plugin.getClass().getClassLoader(), CLASS_NAME, data).loadClass(CLASS_NAME),
-                MethodType.methodType(void.class, UUID.class)
-        ).asType(MethodType.methodType(EmulatedPlayer.class, UUID.class));
+        Constructor<?> constructor = new MemoryClassLoader(plugin.getClass().getClassLoader(), CLASS_NAME, data).loadClass(CLASS_NAME).getDeclaredConstructor(UUID.class);
+        constructor.setAccessible(true);
+        return MethodHandles.lookup().unreflectConstructor(constructor).asType(MethodType.methodType(EmulatedPlayer.class, UUID.class));
     }
 
     public byte[] export() {
@@ -71,9 +70,20 @@ public final class PlayerVisitor extends TranslationVisitor {
     }
 
     @Override
+    public void visit(int version, int access, String name, String signature, String extended, String[] implemented) {
+        if (flip) try {
+            if (implemented != null) for (String s : implemented) scan(s);
+            if (extended != null) scan(extended);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        super.visit(version, access, name, signature, extended, implemented);
+    }
+
+    @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
         if (flip) {
-            if ((access & ACC_PUBLIC) != 0 && (access & ACC_STATIC) == 0 && (access & ACC_FINAL) == 0) {
+            if ((access & (ACC_PUBLIC | ACC_STATIC | ACC_FINAL | ACC_SYNTHETIC)) == ACC_PUBLIC) {
                 String status = "Merged:      ";
                 if (methods.add(name + descriptor)) {
                     final Translation translation = translations.get(identify(name, descriptor));
@@ -88,7 +98,7 @@ public final class PlayerVisitor extends TranslationVisitor {
                         final Type method = Type.getMethodType(descriptor);
                         final Type returns = method.getReturnType();
 
-                        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_FINAL, name, descriptor, signature, exceptions);
+                        MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_SYNTHETIC, name, descriptor, signature, exceptions);
                         mv.visitLabel(new Label());
                         if (translated && translation.special != null) {
                             // This translation uses special pre-prepared bytecode instructions
@@ -113,7 +123,7 @@ public final class PlayerVisitor extends TranslationVisitor {
                                 mv.visitInsn((translated)? ICONST_1 : ICONST_0);
                                 xldc(mv, returns);
                                 xpush(mv, length);
-                                mv.visitTypeInsn(ANEWARRAY, Type.getInternalName(Class.class));
+                                mv.visitTypeInsn(ANEWARRAY, "java/lang/Class");
                                 for (int i = 0; i < length; ++i) {
                                     mv.visitInsn(DUP);
                                     xpush(mv, i);
@@ -121,14 +131,14 @@ public final class PlayerVisitor extends TranslationVisitor {
                                     mv.visitInsn(AASTORE);
                                 }
                                 xpush(mv, length);
-                                mv.visitTypeInsn(ANEWARRAY, Type.getInternalName(Object.class));
+                                mv.visitTypeInsn(ANEWARRAY, "java/lang/Object");
                                 for (int a = 1, i = 0; i < length; ++i) {
                                     mv.visitInsn(DUP);
                                     xpush(mv, i);
                                     a += xload(mv, params[i], a, true);
                                     mv.visitInsn(AASTORE);
                                 }
-                                mv.visitMethodInsn(INVOKESPECIAL, EMU_PATH, EMU_METHOD, "(ZLjava/lang/Class;[Ljava/lang/Class;[Ljava/lang/Object;)V", false);
+                                mv.visitMethodInsn(INVOKESPECIAL, EMU_PATH, DEBUG_METHOD, "(ZLjava/lang/Class;[Ljava/lang/Class;[Ljava/lang/Object;)V", false);
                                 mv.visitLabel(orElse);
                             }
 
@@ -250,7 +260,7 @@ public final class PlayerVisitor extends TranslationVisitor {
             default:
                 throw new AssertionError();
         }
-        mv.visitFieldInsn(GETSTATIC, Type.getInternalName(boxer), "TYPE", Type.getDescriptor(Class.class));
+        mv.visitFieldInsn(GETSTATIC, Type.getInternalName(boxer), "TYPE", "Ljava/lang/Class;");
     }
 
     private static int xload(MethodVisitor mv, Type type, int i, boolean box) {

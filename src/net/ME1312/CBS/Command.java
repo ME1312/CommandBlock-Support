@@ -236,8 +236,8 @@ final class Command extends org.bukkit.command.Command {
     }
 
     private boolean run(CommandSender sender, CommandSender target, String[] args, int i) {
-        org.bukkit.command.Command command;
-        String label = args[i];
+        final org.bukkit.command.Command command;
+        final String label = args[i];
         try {
             command = ((CommandMap) commands.invokeExact(Bukkit.getServer())).getCommand(label);
         } catch (Throwable e) {
@@ -389,7 +389,7 @@ final class Command extends org.bukkit.command.Command {
                     values.addFirst("-");
                 }
             } else if (i < args.length) {
-                org.bukkit.command.Command command;
+                final org.bukkit.command.Command command;
                 try {
                     command = ((CommandMap) commands.invoke(Bukkit.getServer())).getCommand(args[i]);
                 } catch (Throwable e) {

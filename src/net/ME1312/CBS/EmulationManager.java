@@ -72,14 +72,13 @@ public final class EmulationManager extends JavaPlugin {
     }
 
     public static void registerCommand(String prefix, org.bukkit.command.Command... commands) {
-        CommandMap mappings;
         try {
-            mappings = (CommandMap) EmulationManager.commands.invokeExact(Bukkit.getServer());
+            CommandMap mappings = (CommandMap) EmulationManager.commands.invokeExact(Bukkit.getServer());
+            for (org.bukkit.command.Command command : commands) {
+                mappings.register(prefix, command);
+            }
         } catch (Throwable e) {
             throw Unsafe.rethrow(e);
-        }
-        for (org.bukkit.command.Command command : commands) {
-            mappings.register(prefix, command);
         }
     }
 

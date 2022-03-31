@@ -3,7 +3,6 @@ package net.ME1312.CBS.ASM;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import org.bukkit.Bukkit;
-import org.bukkit.Server;
 import org.objectweb.asm.*;
 
 import java.io.IOException;
@@ -18,8 +17,8 @@ import static net.ME1312.CBS.ASM.PlayerVisitor.DEBUG;
 import static org.objectweb.asm.Opcodes.*;
 
 class TranslationVisitor extends ClassVisitor {
-    private static final String TRANSLATION = Type.getDescriptor(net.ME1312.CBS.ASM.Translation.class);
-    private static final String DEBUG_DESC = Type.getDescriptor(SuppressDebugging.class);
+    private static final String TRANSLATION = "Lnet/ME1312/CBS/ASM/Translation;";
+    private static final String DEBUG_DESC = "Lnet/ME1312/CBS/ASM/SuppressDebugging;";
 
     final HashMap<String, Translation> translations = new HashMap<>();
     final HashSet<String> classes = new HashSet<>();
@@ -44,7 +43,7 @@ class TranslationVisitor extends ClassVisitor {
         }
     }
 
-    private void scan(String path) throws IOException {
+    void scan(String path) throws IOException {
         if (classes.add(path)) {
             try {
                 scan(Class.forName(path.replace('/', '.')), path);
@@ -66,18 +65,12 @@ class TranslationVisitor extends ClassVisitor {
 
     @Override
     public void visit(int version, int access, String name, String signature, String extended, String[] implemented) {
-        try {
-            if (implemented != null) for (String s : implemented) scan(s);
-            if (extended != null) scan(extended);
-            if (DEBUG) {
-                if (!spaced) {
-                    log.info("");
-                    log.info("");
-                }
-                log.info("CBS > Scanning class for " + stage + ": " + name.replace('/', '.'));
+        if (DEBUG) {
+            if (!spaced) {
+                log.info("");
+                log.info("");
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+            log.info("CBS > Scanning class for " + stage + ": " + name.replace('/', '.'));
         }
     }
 
@@ -150,7 +143,7 @@ class TranslationVisitor extends ClassVisitor {
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if ((access & ACC_PUBLIC) != 0 && (access & ACC_STATIC) == 0 && Character.isJavaIdentifierStart(name.charAt(0))) {
+        if ((access & (ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC)) == ACC_PUBLIC) {
             return new MethodVisitor(ASM9) {
                 private final Multimap<String, String> map = LinkedListMultimap.create();
                 private boolean debug = true;
@@ -172,7 +165,7 @@ class TranslationVisitor extends ClassVisitor {
                         translation = new Translation(name, descriptor, debug, null);
                     } else if (name.equals("getServer") && descriptor.startsWith("()")) {
                         translation = new Translation(name, descriptor, debug, (mv, returns) -> {
-                            mv.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Bukkit.class), "getServer", "()" + Type.getDescriptor(Server.class), false);
+                            mv.visitMethodInsn(INVOKESTATIC, "org/bukkit/Bukkit", "getServer", "()Lorg/bukkit/Server;", false);
                             mv.visitInsn(ARETURN);
                         });
                     } else if (name.equals("getPlayer") && descriptor.startsWith("()")) {

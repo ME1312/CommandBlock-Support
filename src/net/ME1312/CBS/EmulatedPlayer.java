@@ -18,9 +18,8 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 
 @SuppressWarnings({"NullableProblems", "unused"})
-public abstract class EmulatedPlayer /* extends Player */ {
-    private static final String CBS = Command.class.getCanonicalName();
-    private static final String LOCALE;
+public abstract class EmulatedPlayer /* implements Player */ {
+    private static final String locale;
     final Set<CommandSender> subs;
   //private final Unsafe unsafe;
     protected boolean debug;
@@ -83,7 +82,7 @@ public abstract class EmulatedPlayer /* extends Player */ {
             int i = 2;
             do {
                 e = stack[i];
-                if (CBS.equals(e.getClassName())) {
+                if ("net.ME1312.CBS.Command".equals(e.getClassName())) {
                     msg.append("... ")
                             .append(stack.length - i)
                             .append(" more");
@@ -97,11 +96,17 @@ public abstract class EmulatedPlayer /* extends Player */ {
     }
 
     @SuppressDebugging
+    public String toString() {
+        final String uid = this.uid.toString();
+        return "EmulatedPlayer(" + uid + ((name.equals(uid))? "" : ", " + name) + ')';
+    }
+
+    @SuppressDebugging
     public String getLocale() {
-        return LOCALE;
+        return locale;
     } static {
         Locale def = Locale.getDefault();
-        LOCALE = def.getLanguage() + '_' + def.getCountry().toLowerCase(Locale.ROOT);
+        locale = def.getLanguage() + '_' + def.getCountry().toLowerCase(Locale.ROOT);
     }
 
     @SuppressDebugging
