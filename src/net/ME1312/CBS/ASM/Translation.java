@@ -10,8 +10,11 @@ public @interface Translation {
     String name() default "";
 
     // Use this to specify different method parameters
-    // The amount and position of parameters in the translation must be the same as those in the @annotated method
+    // The position of parameters in the translation must be the same as those in the @annotated method
     Class<?>[] params() default {};
+
+    // Use this to specify where the first parameter of the @annotated method appears in the translation
+    int index() default 0;
 
     // Use this to specify multiple additional translation mappings
     // To preserve code clarity, this should not be combined with the fields above
@@ -24,5 +27,6 @@ public @interface Translation {
         // These function the same as the fields above
         String name() default "";
         Class<?>[] params() default {};
+        int index() default 0;
     }
 }

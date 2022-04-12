@@ -214,7 +214,7 @@ final class Command extends org.bukkit.command.Command {
                 if (uid == null) uid = UUID.nameUUIDFromBytes(((name == null)? "cbs:" : "cbs:" + name).getBytes(StandardCharsets.UTF_8));
                 EmulatedPlayer player = plugin.getPlayer(uid);
                 if (name != null) player.name = name;
-                player.pos = new Location(world, x, y, z, yaw, pitch);
+                player.setLocation(world, x, y, z, yaw, pitch);
                 player.debug = debug;
 
                 try {

@@ -1,7 +1,5 @@
 package net.ME1312.CBS.ASM;
 
-import com.google.common.collect.LinkedListMultimap;
-import com.google.common.collect.Multimap;
 import org.bukkit.Bukkit;
 import org.objectweb.asm.*;
 
@@ -9,7 +7,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
 
@@ -20,7 +19,7 @@ class TranslationVisitor extends ClassVisitor {
     private static final String TRANSLATION = "Lnet/ME1312/CBS/ASM/Translation;";
     private static final String DEBUG_DESC = "Lnet/ME1312/CBS/ASM/SuppressDebugging;";
 
-    final HashMap<String, Translation> translations = new HashMap<>();
+    final HashMap<String, Sender> translations = new HashMap<>();
     final HashSet<String> classes = new HashSet<>();
     boolean flip, spaced;
     final Logger log;
@@ -89,14 +88,15 @@ class TranslationVisitor extends ClassVisitor {
         return name + descriptor.substring(0, index + 1);
     }
 
-    private static final class Translate extends AnnotationVisitor {
-        private final Multimap<String, String> map;
+    private static final class Parser extends AnnotationVisitor {
+        private final List<Sender> senders;
         private final String name, desc, returns;
         private String $name, $desc;
+        private int index;
 
-        private Translate(Multimap<String, String> map, String name, String descriptor, String returns) {
+        private Parser(List<Sender> senders, String name, String descriptor, String returns) {
             super(ASM9);
-            this.map = map;
+            this.senders = senders;
             this.name = name;
             this.desc = descriptor;
             this.returns = returns;
@@ -104,7 +104,11 @@ class TranslationVisitor extends ClassVisitor {
 
         @Override
         public void visit(String name, Object value) {
-            $name = value.toString();
+            if ("index".equals(name)) {
+                index = (int) (Integer) value;
+            } else {
+                $name = value.toString();
+            }
         }
 
         @Override
@@ -127,7 +131,7 @@ class TranslationVisitor extends ClassVisitor {
                 return new AnnotationVisitor(ASM9) {
                     @Override
                     public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                        return new Translate(map, Translate.this.name, desc, returns);
+                        return new Parser(senders, Parser.this.name, desc, returns);
                     }
                 };
             }
@@ -136,16 +140,16 @@ class TranslationVisitor extends ClassVisitor {
         @Override
         public void visitEnd() {
             if ($name != null || $desc != null) {
-                map.put(($name != null)? $name : name, ($desc != null)? $desc : desc);
+                senders.add(new Sender(($name != null)? $name : name, ($desc != null)? $desc : desc, index, true));
             }
         }
     }
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if ((access & (ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC)) == ACC_PUBLIC) {
+        if (((access & ACC_PUBLIC) != 0 || (access & ACC_PROTECTED) != 0) && (access & (ACC_STATIC | ACC_SYNTHETIC)) == 0) {
             return new MethodVisitor(ASM9) {
-                private final Multimap<String, String> map = LinkedListMultimap.create();
+                private final List<Sender> senders = new LinkedList<Sender>();
                 private boolean debug = true;
 
                 @Override
@@ -153,34 +157,33 @@ class TranslationVisitor extends ClassVisitor {
                     if (desc.equals(DEBUG_DESC)) {
                         debug = false;
                     } else if (desc.equals(TRANSLATION)) {
-                        return new Translate(map, name, descriptor, Type.getReturnType(descriptor).getDescriptor());
+                        return new Parser(senders, name, descriptor, Type.getReturnType(descriptor).getDescriptor());
                     }
                     return null;
                 }
 
                 @Override
                 public void visitEnd() {
-                    final Translation translation;
+                    final int length = Type.getArgumentTypes(descriptor).length;
+                    final Receiver translation;
                     if ((access & ACC_ABSTRACT) == 0) {
-                        translation = new Translation(name, descriptor, debug, null);
-                    } else if (name.equals("getServer") && descriptor.startsWith("()")) {
-                        translation = new Translation(name, descriptor, debug, (mv, returns) -> {
-                            mv.visitMethodInsn(INVOKESTATIC, "org/bukkit/Bukkit", "getServer", "()Lorg/bukkit/Server;", false);
+                        translation = new Receiver(name, descriptor, length, debug, null);
+                    } else if (name.equals("getServer") && length == 0) {
+                        translation = new Receiver(name, descriptor, length, debug, (mv, returns) -> {
+                            mv.visitMethodInsn(INVOKESTATIC, "org/bukkit/Bukkit", name, descriptor, false);
                             mv.visitInsn(ARETURN);
                         });
-                    } else if (name.equals("getPlayer") && descriptor.startsWith("()")) {
-                        translation = new Translation(name, descriptor, debug, (mv, returns) -> {
+                    } else if (name.equals("getPlayer") && length == 0) {
+                        translation = new Receiver(name, descriptor, length, debug, (mv, returns) -> {
                             mv.visitVarInsn(ALOAD, 0);
                             mv.visitInsn(ARETURN);
                         });
                     } else {
-                        translation = null;
+                        return;
                     }
 
-                    if (translation != null) {
-                        for (Map.Entry<String, String> e : map.entries()) add(e.getKey(), e.getValue(), true, translation);
-                        add(name, descriptor, false, translation);
-                    }
+                    for (Sender sender : senders) add(sender, translation);
+                    if ((access & ACC_PUBLIC) != 0) add(new Sender(name, descriptor, 0, false), translation);
                 }
             };
         } else {
@@ -188,37 +191,86 @@ class TranslationVisitor extends ClassVisitor {
         }
     }
 
-    private void add(String name, String descriptor, boolean annotated, Translation translation) {
-        TranslationVisitor.this.translations.compute(identify(name, descriptor), (key, value) -> {
+    private void add(Sender sender, Receiver receiver) {
+        translations.compute(identify(sender.name, sender.desc), (key, value) -> {
             if (value == null) {
-                if (DEBUG) log.info(((annotated)? "@Found: " : "Found:  ") + name + descriptor);
-                return translation;
+                if (DEBUG) log.info(((sender.synthetic)? "@Found: " : "Found:  ") + sender.name + sender.desc);
+                sender.translation = receiver;
+                return sender;
             } else {
-                if (DEBUG && !annotated) log.info("Merged: " + name + descriptor);
+                if (DEBUG && !sender.synthetic) log.info("Merged: " + sender.name + sender.desc);
                 return value;
             }
         });
     }
 
-    final static class Translation {
+    final static class Sender {
+        private Receiver translation;
+        final String name, desc;
+        final boolean synthetic;
+        final int index;
+
+        private Sender(String name, String descriptor, int index, boolean synthetic) {
+            this.name = name;
+            this.desc = descriptor;
+            this.index = index;
+            this.synthetic = synthetic;
+        }
+
+        Receiver translate() {
+            return translation;
+        }
+    }
+
+    final static class Receiver {
         final BiConsumer<MethodVisitor, Type> special;
         final String name, desc;
         private Class<?> returns;
         final boolean debug;
+        final int length;
 
-        private Translation(String name, String descriptor, boolean debug, BiConsumer<MethodVisitor, Type> special) {
+        private Receiver(String name, String descriptor, int length, boolean debug, BiConsumer<MethodVisitor, Type> special) {
             this.name = name;
             this.desc = descriptor;
+            this.length = length;
             this.debug = debug;
             this.special = special;
         }
 
         boolean checkcast(Type type) {
             try {
-                if (returns == null) returns = Class.forName(Type.getReturnType(desc).getClassName());
-                return !Class.forName(type.getClassName()).isAssignableFrom(returns);
+                if (returns == null) returns = load(Type.getReturnType(desc));
+                return !load(type).isAssignableFrom(returns);
             } catch (ClassNotFoundException e) {
                 return true;
+            }
+        }
+
+        private static Class<?> load(Type type) throws ClassNotFoundException {
+            switch (type.getSort()) {
+                case Type.VOID:
+                    return void.class;
+                case Type.BOOLEAN:
+                    return boolean.class;
+                case Type.CHAR:
+                    return char.class;
+                case Type.BYTE:
+                    return byte.class;
+                case Type.SHORT:
+                    return short.class;
+                case Type.INT:
+                    return int.class;
+                case Type.FLOAT:
+                    return float.class;
+                case Type.LONG:
+                    return long.class;
+                case Type.DOUBLE:
+                    return double.class;
+                case Type.ARRAY:
+                case Type.OBJECT:
+                    return Class.forName(type.getInternalName().replace('/', '.'));
+                default:
+                    throw new AssertionError();
             }
         }
     }

@@ -1,6 +1,8 @@
 package net.ME1312.CBS;
 
 import net.ME1312.CBS.ASM.SuppressDebugging;
+import net.ME1312.CBS.ASM.Translation;
+import net.ME1312.CBS.ASM.Translation.For;
 
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.BaseComponent;
@@ -24,8 +26,10 @@ public abstract class EmulatedPlayer /* implements Player */ {
   //private final Unsafe unsafe;
     protected boolean debug;
     private final UUID uid;
+    private World world;
+    private double x, y, z;
+    private float yaw, pitch;
     private String display;
-    Location pos;
     String name;
 
     protected EmulatedPlayer(UUID uid) {
@@ -78,17 +82,18 @@ public abstract class EmulatedPlayer /* implements Player */ {
             }
             msg.append("}\nreturns: ")
                     .append(returns.getCanonicalName())
-                    .append("\ncallers:\n    ");
+                    .append("\ncallers:");
             int i = 2;
             do {
                 e = stack[i];
+                msg.append("\n    ");
                 if ("net.ME1312.CBS.Command".equals(e.getClassName())) {
                     msg.append("... ")
                             .append(stack.length - i)
                             .append(" more");
                     break;
                 }
-                msg.append(e).append("\n    ");
+                msg.append(e);
             } while (++i < stack.length);
             msg.append('\n');
             Bukkit.getLogger().log((translated)? Level.INFO : Level.WARNING, msg.toString());
@@ -148,6 +153,16 @@ public abstract class EmulatedPlayer /* implements Player */ {
         }
 
         @Override
+        public void sendMessage(UUID sender, BaseComponent msg) {
+            for (CommandSender s : subs) s.spigot().sendMessage(sender, msg);
+        }
+
+        @Override
+        public void sendMessage(UUID sender, BaseComponent... msgs) {
+            for (CommandSender s : subs) s.spigot().sendMessage(sender, msgs);
+        }
+
+        @Override
         public void sendMessage(ChatMessageType ctx, BaseComponent msg) {
             if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT) sendMessage(msg);
         }
@@ -159,14 +174,12 @@ public abstract class EmulatedPlayer /* implements Player */ {
 
         @Override
         public void sendMessage(ChatMessageType ctx, UUID sender, BaseComponent msg) {
-            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT)
-                for (CommandSender s : subs) s.spigot().sendMessage(sender, msg);
+            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT) sendMessage(sender, msg);
         }
 
         @Override
         public void sendMessage(ChatMessageType ctx, UUID sender, BaseComponent... msgs) {
-            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT)
-                for (CommandSender s : subs) s.spigot().sendMessage(sender, msgs);
+            if (ctx == net.md_5.bungee.api.ChatMessageType.CHAT) sendMessage(sender, msgs);
         }
     }
 
@@ -178,11 +191,8 @@ public abstract class EmulatedPlayer /* implements Player */ {
         return uid;
     }
 
+    @Translation(name = "getPlayerListName")
     public String getName() {
-        return name;
-    }
-
-    public String getPlayerListName() {
         return name;
     }
 
@@ -194,88 +204,71 @@ public abstract class EmulatedPlayer /* implements Player */ {
         display = name;
     }
 
-    public boolean isValid() {
-        return true;
-    }
-
-    public boolean isPersistent() {
-        return true;
-    }
-
-    public boolean hasPlayedBefore() {
-        return true;
-    }
-
-    public boolean isWhitelisted() {
-        return true;
-    }
-
-    public boolean isOnline() {
-        return true;
-    }
-
     public GameMode getGameMode() {
         return GameMode.CREATIVE;
     }
 
-    public Location getEyeLocation() {
-        return pos;
-    }
-
-    public Location getLocation() {
-        return pos;
-    }
-
-    public Location getLocation(Location location) {
-        return pos;
-    }
-
-    public boolean teleport(Location location) {
-        pos = location;
-        return true;
-    }
-
-    public boolean teleport(Location location, TeleportCause cause) {
-        return teleport(location);
-    }
-
-    public boolean teleport(Entity entity) {
-        return teleport(entity.getLocation());
-    }
-
-    public boolean teleport(Entity entity, TeleportCause cause) {
-        return teleport(entity);
-    }
-
     public World getWorld() {
-        return pos.getWorld();
+        return world;
     }
 
-    public boolean isInvisible() {
+    @Translation(name = "getEyeLocation")
+    public Location getLocation() {
+        return new Location(world, x, y, z, yaw, pitch);
+    }
+
+    public Location getLocation(Location reference) {
+        if (reference != null) {
+            reference.setWorld(world);
+            reference.setX(x);
+            reference.setY(y);
+            reference.setZ(z);
+            reference.setYaw(yaw);
+            reference.setPitch(pitch);
+        }
+        return reference;
+    }
+
+    final void setLocation(World world, double x, double y, double z, float yaw, float pitch) {
+        this.world = world;
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.yaw = yaw;
+        this.pitch = pitch;
+    }
+
+    private void setLocation(Location location) {
+        setLocation(location.getWorld(), location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
+    }
+
+    @Translation(params = { Location.class, TeleportCause.class })
+    public boolean teleport(Location location) {
+        setLocation(location);
         return true;
     }
 
-    public boolean isInvulnerable() {
+    @Translation(params = { Entity.class, TeleportCause.class })
+    public boolean teleport(Entity entity) {
+        setLocation(entity.getLocation());
         return true;
     }
 
-    public boolean isOp() {
-        return true;
-    }
-
-    public boolean isPermissionSet(String permission) {
-        return true;
-    }
-
-    public boolean isPermissionSet(Permission permission) {
-        return true;
-    }
-
-    public boolean hasPermission(String permission) {
-        return true;
-    }
-
-    public boolean hasPermission(Permission permission) {
+    @Translation({
+            @For(name = "isValid"),
+            @For(name = "isPersistent"),
+            @For(name = "hasPlayedBefore"),
+            @For(name = "isWhitelisted"),
+            @For(name = "isOnline"),
+            @For(name = "isInvisible"),
+            @For(name = "isInvulnerable"),
+            @For(name = "hasPermission", params = String.class),
+            @For(name = "hasPermission", params = Permission.class),
+            @For(name = "isPermissionSet", params = String.class),
+            @For(name = "isPermissionSet", params = Permission.class),
+            @For(name = "isOp")
+    })
+    protected final boolean Z() {
         return true;
     }
 }

@@ -86,7 +86,8 @@ public final class PlayerVisitor extends TranslationVisitor {
             if ((access & (ACC_PUBLIC | ACC_STATIC | ACC_FINAL | ACC_SYNTHETIC)) == ACC_PUBLIC) {
                 String status = "Merged:      ";
                 if (methods.add(name + descriptor)) {
-                    final Translation translation = translations.get(identify(name, descriptor));
+                    final Sender method = translations.get(identify(name, descriptor));
+                    final Receiver translation = (method == null)? null : method.translate();
                     final boolean translated = translation != null;
                     status = "Skipped:     ";
 
@@ -95,8 +96,7 @@ public final class PlayerVisitor extends TranslationVisitor {
                         status = "@Redirected: ";
 
                     } else if (translated || (access & ACC_ABSTRACT) != 0) {
-                        final Type method = Type.getMethodType(descriptor);
-                        final Type returns = method.getReturnType();
+                        final Type returns = Type.getReturnType(descriptor);
 
                         MethodVisitor mv = cv.visitMethod(ACC_PUBLIC | ACC_SYNTHETIC, name, descriptor, signature, exceptions);
                         mv.visitLabel(new Label());
@@ -105,10 +105,10 @@ public final class PlayerVisitor extends TranslationVisitor {
                             translation.special.accept(mv, returns);
                             status = "Implemented: ";
                         } else {
-                            final Type[] params = method.getArgumentTypes();
+                            final Type[] params = Type.getArgumentTypes(descriptor);
                             final int length = params.length;
 
-                            // Installs code for method debugging (unless @suppressed)
+                            // Install code for method debugging (unless @suppressed)
                             mv.visitVarInsn(ALOAD, 0);
                             if (!translated || translation.debug) {
                                 if (translated) mv.visitInsn(DUP);
@@ -142,16 +142,31 @@ public final class PlayerVisitor extends TranslationVisitor {
                                 mv.visitLabel(orElse);
                             }
 
-                            // Handles method translation
+                            // Handle method translation
                             if (translated) {
-                                for (int a = 1, i = 0; i < length; ++i) {
-                                    a += xload(mv, params[i], a, false);
+                                int index = method.index;
+                                int adjusted = index + translation.length;
+                                if (adjusted > length) {
+                                    adjusted = length;
+                                    index = Math.max(length - translation.length, 0);
+                                }
+
+                                int i = 0, a = 1;
+                                for (int type; i < index; ++i) {
+                                    if ((type = params[i].getSort()) == Type.LONG || type == Type.DOUBLE) {
+                                        a += 2;
+                                    } else ++a;
+                                }
+                                while (i < adjusted) {
+                                    a += xload(mv, params[i++], a, false);
                                 }
                                 mv.visitMethodInsn(INVOKESPECIAL, EMU_PATH, translation.name, translation.desc, false);
                                 status = (translation.debug)? "Translated:  " : "@Translated: ";
                             } else {
                                 status = "Defaulted:   ";
                             }
+
+                            // Maybe return something
                             switch (returns.getSort()) {
                                 case Type.VOID:
                                     mv.visitInsn(RETURN);
@@ -200,22 +215,22 @@ public final class PlayerVisitor extends TranslationVisitor {
 
     private static void xpush(MethodVisitor mv, int i) {
         switch (i) {
-            case  0:
+            case 0:
                 mv.visitInsn(ICONST_0);
                 return;
-            case  1:
+            case 1:
                 mv.visitInsn(ICONST_1);
                 return;
-            case  2:
+            case 2:
                 mv.visitInsn(ICONST_2);
                 return;
-            case  3:
+            case 3:
                 mv.visitInsn(ICONST_3);
                 return;
-            case  4:
+            case 4:
                 mv.visitInsn(ICONST_4);
                 return;
-            case  5:
+            case 5:
                 mv.visitInsn(ICONST_5);
                 return;
             default:
