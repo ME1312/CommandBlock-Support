@@ -242,6 +242,11 @@ public abstract class EmulatedPlayer /* implements Player */ {
         setLocation(location.getWorld(), location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
     }
 
+    public void setRotation(float yaw, float pitch) {
+        this.yaw = yaw;
+        this.pitch = pitch;
+    }
+
     @Translation(params = { Location.class, TeleportCause.class })
     public boolean teleport(Location location) {
         setLocation(location);

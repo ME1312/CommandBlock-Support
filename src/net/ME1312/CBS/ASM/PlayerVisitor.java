@@ -106,7 +106,6 @@ public final class PlayerVisitor extends TranslationVisitor {
                             status = "Implemented: ";
                         } else {
                             final Type[] params = Type.getArgumentTypes(descriptor);
-                            final int length = params.length;
 
                             // Install code for method debugging (unless @suppressed)
                             mv.visitVarInsn(ALOAD, 0);
@@ -122,17 +121,17 @@ public final class PlayerVisitor extends TranslationVisitor {
                                 }
                                 mv.visitInsn((translated)? ICONST_1 : ICONST_0);
                                 xldc(mv, returns);
-                                xpush(mv, length);
+                                xpush(mv, params.length);
                                 mv.visitTypeInsn(ANEWARRAY, "java/lang/Class");
-                                for (int i = 0; i < length; ++i) {
+                                for (int i = 0; i < params.length; ++i) {
                                     mv.visitInsn(DUP);
                                     xpush(mv, i);
                                     xldc(mv, params[i]);
                                     mv.visitInsn(AASTORE);
                                 }
-                                xpush(mv, length);
+                                xpush(mv, params.length);
                                 mv.visitTypeInsn(ANEWARRAY, "java/lang/Object");
-                                for (int a = 1, i = 0; i < length; ++i) {
+                                for (int a = 1, i = 0; i < params.length; ++i) {
                                     mv.visitInsn(DUP);
                                     xpush(mv, i);
                                     a += xload(mv, params[i], a, true);
@@ -145,20 +144,21 @@ public final class PlayerVisitor extends TranslationVisitor {
                             // Handle method translation
                             if (translated) {
                                 int index = method.index;
-                                int adjusted = index + translation.length;
-                                if (adjusted > length) {
-                                    adjusted = length;
-                                    index = Math.max(length - translation.length, 0);
+                                int length = index + translation.params.length;
+                                if (length > params.length) {
+                                    length = params.length;
+                                    index = Math.max(params.length - translation.params.length, 0);
                                 }
 
-                                int i = 0, a = 1;
+                                int x = 0, i = 0, a = 1;
                                 for (int type; i < index; ++i) {
                                     if ((type = params[i].getSort()) == Type.LONG || type == Type.DOUBLE) {
                                         a += 2;
                                     } else ++a;
                                 }
-                                while (i < adjusted) {
-                                    a += xload(mv, params[i++], a, false);
+                                for (Type param; i < length; ++x, ++i) {
+                                    a += xload(mv, param = params[i], a, false);
+                                    if (translation.checkcast(x, param)) mv.visitTypeInsn(CHECKCAST, translation.params[x].getInternalName());
                                 }
                                 mv.visitMethodInsn(INVOKESPECIAL, EMU_PATH, translation.name, translation.desc, false);
                                 status = (translation.debug)? "Translated:  " : "@Translated: ";

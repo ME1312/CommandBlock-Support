@@ -164,17 +164,17 @@ class TranslationVisitor extends ClassVisitor {
 
                 @Override
                 public void visitEnd() {
-                    final int length = Type.getArgumentTypes(descriptor).length;
+                    final Type[] params = Type.getArgumentTypes(descriptor);
                     final Receiver translation;
                     if ((access & ACC_ABSTRACT) == 0) {
-                        translation = new Receiver(name, descriptor, length, debug, null);
-                    } else if (name.equals("getServer") && length == 0) {
-                        translation = new Receiver(name, descriptor, length, debug, (mv, returns) -> {
+                        translation = new Receiver(name, descriptor, params, debug, null);
+                    } else if (name.equals("getServer") && params.length == 0) {
+                        translation = new Receiver(name, descriptor, params, debug, (mv, returns) -> {
                             mv.visitMethodInsn(INVOKESTATIC, "org/bukkit/Bukkit", name, descriptor, false);
                             mv.visitInsn(ARETURN);
                         });
-                    } else if (name.equals("getPlayer") && length == 0) {
-                        translation = new Receiver(name, descriptor, length, debug, (mv, returns) -> {
+                    } else if (name.equals("getPlayer") && params.length == 0) {
+                        translation = new Receiver(name, descriptor, params, debug, (mv, returns) -> {
                             mv.visitVarInsn(ALOAD, 0);
                             mv.visitInsn(ARETURN);
                         });
@@ -225,22 +225,35 @@ class TranslationVisitor extends ClassVisitor {
     final static class Receiver {
         final BiConsumer<MethodVisitor, Type> special;
         final String name, desc;
-        private Class<?> returns;
+        final Type[] params;
+        private final Class<?>[] args;
+        private Class<?> type;
+        final Type returns;
         final boolean debug;
-        final int length;
 
-        private Receiver(String name, String descriptor, int length, boolean debug, BiConsumer<MethodVisitor, Type> special) {
+        private Receiver(String name, String descriptor, Type[] params, boolean debug, BiConsumer<MethodVisitor, Type> special) {
             this.name = name;
             this.desc = descriptor;
-            this.length = length;
+            this.params = params;
+            this.args = new Class[params.length];
+            this.returns = Type.getReturnType(descriptor);
             this.debug = debug;
             this.special = special;
         }
 
+        boolean checkcast(int param, Type type) {
+            try {
+                if (this.args[param] == null) this.args[param] = load(params[param]);
+                return !load(type).isAssignableFrom(args[param]);
+            } catch (ClassNotFoundException e) {
+                return true;
+            }
+        }
+
         boolean checkcast(Type type) {
             try {
-                if (returns == null) returns = load(Type.getReturnType(desc));
-                return !load(type).isAssignableFrom(returns);
+                if (this.type == null) this.type = load(returns);
+                return !load(type).isAssignableFrom(this.type);
             } catch (ClassNotFoundException e) {
                 return true;
             }
