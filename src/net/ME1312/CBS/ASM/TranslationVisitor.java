@@ -139,7 +139,7 @@ class TranslationVisitor extends ClassVisitor {
 
         @Override
         public void visitEnd() {
-            if ($name != null || $desc != null) {
+            if ($name != null || $desc != null || index != 0) {
                 senders.add(new Sender(($name != null)? $name : name, ($desc != null)? $desc : desc, index, true));
             }
         }
@@ -147,7 +147,7 @@ class TranslationVisitor extends ClassVisitor {
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-        if (((access & ACC_PUBLIC) != 0 || (access & ACC_PROTECTED) != 0) && (access & (ACC_STATIC | ACC_SYNTHETIC)) == 0) {
+        if (((access & (ACC_PUBLIC | ACC_FINAL)) == ACC_PUBLIC || (access & ACC_PROTECTED) != 0) && (access & (ACC_STATIC | ACC_SYNTHETIC)) == 0) {
             return new MethodVisitor(ASM9) {
                 private final List<Sender> senders = new LinkedList<Sender>();
                 private boolean debug = true;
@@ -183,7 +183,7 @@ class TranslationVisitor extends ClassVisitor {
                     }
 
                     for (Sender sender : senders) add(sender, translation);
-                    if ((access & ACC_PUBLIC) != 0) add(new Sender(name, descriptor, 0, false), translation);
+                    if ((access & ACC_FINAL) == 0) add(new Sender(name, descriptor, 0, false), translation);
                 }
             };
         } else {

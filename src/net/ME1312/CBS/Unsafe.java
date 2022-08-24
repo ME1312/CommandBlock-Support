@@ -1,5 +1,9 @@
 package net.ME1312.CBS;
 
+import com.google.common.primitives.Primitives;
+import org.bukkit.ChatColor;
+
+import java.lang.reflect.Array;
 import java.util.function.Supplier;
 
 @SuppressWarnings({"unchecked", "unused"})
@@ -20,11 +24,59 @@ final class Unsafe {
         return unsafe;
     }
 
+    // Only misc utility methods beyond this point
     static RuntimeException rethrow(Throwable e) {
         return Unsafe.<RuntimeException>uncheck(e);
     }
 
     private static <T extends Throwable> T uncheck(Throwable e) throws T {
         throw (T) e;
+    }
+
+    public String toString() {
+        return toString(data);
+    }
+
+    static String toString(Object[] array) {
+        StringBuilder builder = new StringBuilder();
+        toString(builder, array);
+        return builder.toString();
+    }
+
+    static void toString(StringBuilder str, Object arr) {
+        str.append('{');
+        int length = Array.getLength(arr);
+        if (length != 0) for (int i = 0;;) {
+            str.append(' ');
+            Object obj = Array.get(arr, i);
+            if (obj == null) {
+                str.append("null");
+            } else if (obj instanceof Character) {
+                str.append('\'').append((char) obj).append('\'');
+            } else if (obj instanceof String) {
+                str.append('\"').append(obj.toString()).append('\"');
+            } else if (obj instanceof Class) {
+                str.append(((Class<?>) obj).getTypeName()).append(".class");
+            } else {
+                Class<?> type = obj.getClass();
+                if (type.isArray()) {
+                    if (i == 0) str.delete(str.length() - 1, str.length());
+                    toString(str, obj);
+                } else if (Primitives.isWrapperType(type)) {
+                    str.append(obj.toString());
+                } else {
+                    str.append(type.getTypeName()).append('@').append(Integer.toHexString(obj.hashCode()));
+                }
+            }
+
+            if (++i < length) {
+                str.append(',');
+            } else {
+                if (str.codePointAt(str.length() - 1) != '}')
+                    str.append(' ');
+                break;
+            }
+        }
+        str.append('}');
     }
 }

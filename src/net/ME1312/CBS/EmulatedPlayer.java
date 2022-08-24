@@ -61,27 +61,14 @@ public abstract class EmulatedPlayer /* implements Player */ {
                 msg.append(' ');
                 int i = 0;
                 do {
-                    msg.append(params[i].getCanonicalName());
+                    msg.append(params[i].getTypeName());
                     msg.append(' ');
                 } while (++i < params.length);
             }
-            msg.append("}\narguments: {");
-            if (args.length != 0) {
-                msg.append(' ');
-                int i = 0;
-                do {
-                    Object arg = args[i];
-                    if (arg == null) {
-                        msg.append("null");
-                    } else {
-                        msg.append(arg.getClass().getCanonicalName())
-                                .append('@').append(Integer.toHexString(arg.hashCode()));
-                    }
-                    msg.append(' ');
-                } while (++i < args.length);
-            }
-            msg.append("}\nreturns: ")
-                    .append(returns.getCanonicalName())
+            msg.append("}\narguments: ");
+            Unsafe.toString(msg, args);
+            msg.append("\nreturns: ")
+                    .append(returns.getTypeName())
                     .append("\ncallers:");
             int i = 2;
             do {

@@ -72,8 +72,8 @@ public final class PlayerVisitor extends TranslationVisitor {
     @Override
     public void visit(int version, int access, String name, String signature, String extended, String[] implemented) {
         if (flip) try {
-            if (implemented != null) for (String s : implemented) scan(s);
             if (extended != null) scan(extended);
+            if (implemented != null) for (String s : implemented) scan(s);
         } catch (IOException e) {
             e.printStackTrace();
         }

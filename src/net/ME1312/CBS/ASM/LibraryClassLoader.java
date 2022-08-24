@@ -4,11 +4,11 @@ import java.net.URL;
 import java.net.URLClassLoader;
 
 public final class LibraryClassLoader extends ClassLoader {
-    private final Reload child;
+    private final Reloaded child;
 
     public LibraryClassLoader(URL[] urls, String[] overrides) {
         super(LibraryClassLoader.class.getClassLoader());
-        child = new Reload(urls, overrides, new Wrapper(this.getParent()));
+        child = new Reloaded(urls, overrides, new Wrapped(this.getParent()));
     }
 
     @Override
@@ -22,11 +22,11 @@ public final class LibraryClassLoader extends ClassLoader {
         }
     }
 
-    private static final class Reload extends URLClassLoader {
+    private static final class Reloaded extends URLClassLoader {
         private final String[] whitelist;
-        private final Wrapper next;
+        private final Wrapped next;
 
-        private Reload(URL[] urls, String[] overrides, Wrapper next) {
+        private Reloaded(URL[] urls, String[] overrides, Wrapped next) {
             super(urls, null);
             this.next = next;
             whitelist = overrides;
@@ -44,8 +44,8 @@ public final class LibraryClassLoader extends ClassLoader {
         }
     }
 
-    private static final class Wrapper extends ClassLoader {
-        private Wrapper(ClassLoader parent) {
+    private static final class Wrapped extends ClassLoader {
+        private Wrapped(ClassLoader parent) {
             super(parent);
         }
 
