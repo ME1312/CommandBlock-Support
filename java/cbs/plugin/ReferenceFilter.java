@@ -1,11 +1,11 @@
-package net.ME1312.CBS;
+package cbs.plugin;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.filter.AbstractFilter;
 
-import static net.ME1312.CBS.EmulationManager.reference;
+import static cbs.plugin.EmulationManager.reference;
 import static org.apache.logging.log4j.core.Filter.Result.DENY;
 import static org.apache.logging.log4j.core.Filter.Result.NEUTRAL;
 

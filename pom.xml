@@ -12,48 +12,89 @@
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
+        <repository>
+            <id>me1312-repo</id>
+            <url>https://dev.me1312.net/maven</url>
+        </repository>
     </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>me1312-repo</id>
+            <url>https://dev.me1312.net/maven</url>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <properties>
+        <bridge.version>23w34a</bridge.version>
+    </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.18-rc3-R0.1-SNAPSHOT</version>
+            <version>1.20.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.17.2</version>
+            <version>2.20.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
-            <version>9.2</version>
+            <version>9.5</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.ME1312.ASM</groupId>
+            <artifactId>bridge</artifactId>
+            <version>${bridge.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.ME1312.ASM</groupId>
+            <artifactId>bridge-asm</artifactId>
+            <version>${bridge.version}</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 
     <build>
-        <directory>out/compile/target</directory>
-        <sourceDirectory>src</sourceDirectory>
+        <directory>build</directory>
+        <sourceDirectory>java</sourceDirectory>
         <resources>
             <resource>
-                <directory>src</directory>
-                <excludes>
-                    <exclude>**/*.java</exclude>
-                </excludes>
+                <directory>resources</directory>
             </resource>
         </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.7.0</version>
+                <version>3.6.2</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>net.ME1312.ASM</groupId>
+                <artifactId>bridge-plugin</artifactId>
+                <version>${bridge.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>bridge</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludes>
+                        <exclude>cbs/plugin/EmulatedPlayer.class</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>
@@ -82,7 +123,7 @@
                     <finalName>CBS</finalName>
                     <outputDirectory>artifacts</outputDirectory>
                     <archive>
-                        <manifestFile>src/META-INF/MANIFEST.MF</manifestFile>
+                        <manifestFile>resources/META-INF/MANIFEST.MF</manifestFile>
                     </archive>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>

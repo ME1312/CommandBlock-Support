@@ -1,4 +1,4 @@
-package net.ME1312.CBS.ASM;
+package cbs.asm;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;

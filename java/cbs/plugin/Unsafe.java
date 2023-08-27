@@ -1,7 +1,6 @@
-package net.ME1312.CBS;
+package cbs.plugin;
 
 import com.google.common.primitives.Primitives;
-import org.bukkit.ChatColor;
 
 import java.lang.reflect.Array;
 import java.util.function.Supplier;

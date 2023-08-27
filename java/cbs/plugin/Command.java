@@ -1,4 +1,4 @@
-package net.ME1312.CBS;
+package cbs.plugin;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -18,7 +18,7 @@ import org.bukkit.util.Vector;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import static net.ME1312.CBS.EmulationManager.*;
+import static cbs.plugin.EmulationManager.*;
 import static org.bukkit.ChatColor.*;
 
 final class Command extends org.bukkit.command.Command {
@@ -45,9 +45,11 @@ final class Command extends org.bukkit.command.Command {
             sender.sendMessage("");
             sender.sendMessage(GRAY + ITALIC.toString() + UNDERLINE + desc.getWebsite() + "/wiki/Flags");
             sender.sendMessage("");
-        } else if (args[0].matches("-+m+(?:;.*)?")) {
-            if (args.length != 1) { // Minimal mode (-m) has the sender run the command as themselves. No further permission checks required.
-                if (!run(sender, sender, args, 1)) {
+        } else if (args[0].matches("-m+(?:-.*)?")) {
+            int i = 0; // Minimal mode (-m) has the sender run the command as themselves. No further permission checks required.
+            while (args[i++].indexOf('-', 1) == -1 && args.length > i && args[i].matches("-m*(?:-.*)?"));
+            if (args.length != i) {
+                if (!run(sender, sender, args, i)) {
                     if (sender instanceof BlockCommandSender) {
                         throw reference;
                     } else {
@@ -114,29 +116,30 @@ final class Command extends org.bukkit.command.Command {
 
             int i = 0;
             try {
-                boolean starting = true;
-                for (int c; i < args.length && args[i].startsWith("-"); ++i, starting = true) {
-                    for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) {
+                all: for (int c; i < args.length && args[i].startsWith("-"); ++i) {
+                    PrimitiveIterator.OfInt $i = args[i].codePoints().iterator();
+                    $i.nextInt();
+                    while ($i.hasNext()) {
                         switch (c = $i.nextInt()) {
                             case 'd': {
                                 debug = true;
-                                break;
+                                continue;
                             }
                             case 's': {
                                 sub = true;
-                                break;
+                                continue;
                             }
                             case 'n': {
                                 flag(args.length - i, 1, "-n <username>");
                                 name = args[++i];
-                                break;
+                                continue;
                             }
                             case 'u': {
                                 flag(args.length - i, 1, "-u <uuid>");
                                 String id = args[++i];
                                 try {
                                     uid = UUID.fromString(id);
-                                    break;
+                                    continue;
                                 } catch (IllegalArgumentException e) {
                                     throw new CommandException("Invalid UUID: " + DARK_RED + id);
                                 }
@@ -148,29 +151,29 @@ final class Command extends org.bukkit.command.Command {
                                 if (world == null) {
                                     throw new CommandException("Unknown world: " + DARK_RED + wn);
                                 }
-                                break;
+                                continue;
                             }
                             case 'x': {
                                 flag(args.length - i, 1, "-x <position>");
                                 x = relative(args[++i], x);
-                                break;
+                                continue;
                             }
                             case 'y': {
                                 flag(args.length - i, 1, "-y <position>");
                                 y = relative(args[++i], y);
-                                break;
+                                continue;
                             }
                             case 'z': {
                                 flag(args.length - i, 1, "-z <position>");
                                 z = relative(args[++i], z);
-                                break;
+                                continue;
                             }
                             case 'v': {
                                 flag(args.length - i, 3, "-v <x> <y> <z>");
                                 x = relative(args[++i], x);
                                 y = relative(args[++i], y);
                                 z = relative(args[++i], z);
-                                break;
+                                continue;
                             }
                             case 'c': {
                                 flag(args.length - i, 2, "-c <yaw> <pitch>");
@@ -178,7 +181,7 @@ final class Command extends org.bukkit.command.Command {
                                 try {
                                     yaw = Float.parseFloat(n = args[++i]);
                                     pitch = Float.parseFloat(n = args[++i]);
-                                    break;
+                                    continue;
                                 } catch (NumberFormatException e) {
                                     throw new CommandException("Invalid decimal number: " + DARK_RED + n);
                                 }
@@ -186,26 +189,20 @@ final class Command extends org.bukkit.command.Command {
                             case 'm': {
                                 throw new CommandException("The " + DARK_RED + "-m" + RED + " flag cannot be combined with any other flags");
                             }
-                            case ';': {
-                                throw reference;
-                            }
-                            case '-': if (starting) {
-                                continue;
+                            case '-': {
+                                ++i;
+                                break all;
                             }
                             default: {
                                 throw new CommandException(new StringBuilder("Unknown flag: ").append(DARK_RED).append('-').appendCodePoint(c).toString());
                             }
                         }
-                        starting = false;
                     }
                 }
             } catch (CommandException e) {
                 if (sender instanceof BlockCommandSender) throw reference;
                 sender.sendMessage(prefix(RED, DARK_RED) + e.getMessage());
                 return true;
-            } catch (RuntimeException e) {
-                if (e != reference) throw e;
-                ++i;
             }
 
             if (world == null) {
@@ -322,7 +319,7 @@ final class Command extends org.bukkit.command.Command {
             final LinkedList<Integer> available = new LinkedList<Integer>(flags.keySet());
             final LinkedList<String> values = new LinkedList<String>();
             final String LAST = (args.length > 0)?args[args.length - 1]:"";
-            available.addFirst((int) ';');
+            available.addFirst((int) '-');
             available.add((int) 'm');
 
             int i = 0;
@@ -330,42 +327,41 @@ final class Command extends org.bukkit.command.Command {
             boolean parsing = true;
             if (args.length != 0) {
                 Flag flag;
-                boolean starting = true;
-                for (int x; parsing && args[i].startsWith("-"); i = x, starting = true) {
-                    for (PrimitiveIterator.OfInt $i = args[i].codePoints().iterator(); $i.hasNext(); ) try {
-                        if ((flag = flags.get(x = $i.nextInt())) != null) {
-                            values.addAll(flag.arguments);
-                            available.removeAll(flag.overrides);
-                        } else if (x == 'm') {
-                            available.clear();
-                        } else if (x == ';') {
-                            throw reference;
-                        } else if (x == '-' && starting) {
-                            continue;
-                        }
+                int x;
+                while (args[i].startsWith("-")) {
+                    PrimitiveIterator.OfInt $i = args[i].codePoints().iterator();
+                    $i.nextInt();
+                    if ($i.hasNext()) {
+                        available.remove((Object) (int) 'm');
+                        do {
+                            if ((flag = flags.get(x = $i.nextInt())) != null) {
+                                values.addAll(flag.arguments);
+                                available.removeAll(flag.overrides);
+                            } else if (x == 'm') {
+                                available.clear();
+                                available.add((int) '-');
+                            } else if (x == '-') {
+                                available.clear();
+                                parsing = false;
+                                break;
+                            } else {
+                                return Collections.emptyList();
+                            }
+                        } while ($i.hasNext());
+                    }
 
-                        if (starting) {
-                            available.remove((Object) (int) 'm');
-                            starting = false;
+                    // definition of variable x changes here!
+                    x = ++i + values.size();
+                    if (x >= args.length) {
+                        if (i < args.length && values.size() != 0) {
+                            arg = values.get(args.length - 1 - i);
                         }
-                    } catch (RuntimeException e) {
-                        if (e != reference) throw e;
-                        available.clear();
-                        parsing = false;
+                        values.clear();
                         break;
                     }
-
-                    try { // definition of variable x changes here!
-                        x = ++i + values.size();
-                        if (x >= args.length) {
-                            if (i < args.length && values.size() != 0) {
-                                arg = values.get(args.length - 1 - i);
-                            }
-                            break;
-                        }
-                    } finally {
-                        values.clear();
-                    }
+                    i = x;
+                    values.clear();
+                    if (!parsing) break;
                 }
             }
 

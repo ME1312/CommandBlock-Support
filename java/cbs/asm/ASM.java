@@ -1,7 +1,6 @@
-package net.ME1312.CBS.ASM;
+package cbs.asm;
 
-import net.ME1312.CBS.EmulationManager;
-
+import cbs.plugin.EmulationManager;
 import com.google.common.io.Resources;
 import org.bukkit.Bukkit;
 
@@ -15,7 +14,7 @@ import java.util.logging.Logger;
 public final class ASM {
     private ASM() {}
     private static ClassLoader ASM = null;
-    private static final String ASM_VERSION = "9.2";
+    private static final String ASM_VERSION = "9.5";
     private static final String ASM_DOWNLOAD = "https://repo.maven.apache.org/maven2/org/ow2/asm/$1/" + ASM_VERSION + "/$1-" + ASM_VERSION + ".jar";
 
     public static ClassLoader get(File dir, String... with) {

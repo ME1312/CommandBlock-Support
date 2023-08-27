@@ -1,9 +1,7 @@
-package net.ME1312.CBS;
+package cbs.plugin;
 
-import net.ME1312.CBS.ASM.SuppressDebugging;
-import net.ME1312.CBS.ASM.Translation;
-import net.ME1312.CBS.ASM.Translation.For;
-
+import bridge.Bridge;
+import cbs.asm.SuppressDebugging;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.BaseComponent;
 import org.bukkit.*;
@@ -19,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 
+// Bridging within this class is handled directly by us, instead of as usual by the maven bridge plugin
 @SuppressWarnings({"NullableProblems", "unused"})
 public abstract class EmulatedPlayer /* implements Player */ {
     private static final String locale;
@@ -74,7 +73,7 @@ public abstract class EmulatedPlayer /* implements Player */ {
             do {
                 e = stack[i];
                 msg.append("\n    ");
-                if ("net.ME1312.CBS.Command".equals(e.getClassName())) {
+                if ("cbs.plugin.Command".equals(e.getClassName())) {
                     msg.append("... ")
                             .append(stack.length - i)
                             .append(" more");
@@ -178,7 +177,7 @@ public abstract class EmulatedPlayer /* implements Player */ {
         return uid;
     }
 
-    @Translation(name = "getPlayerListName")
+    @Bridge(name = "getPlayerListName")
     public String getName() {
         return name;
     }
@@ -199,7 +198,7 @@ public abstract class EmulatedPlayer /* implements Player */ {
         return world;
     }
 
-    @Translation(name = "getEyeLocation")
+    @Bridge(name = "getEyeLocation")
     public Location getLocation() {
         return new Location(world, x, y, z, yaw, pitch);
     }
@@ -234,32 +233,30 @@ public abstract class EmulatedPlayer /* implements Player */ {
         this.pitch = pitch;
     }
 
-    @Translation(params = { Location.class, TeleportCause.class })
+    @Bridge(params = { Location.class, TeleportCause.class })
     public boolean teleport(Location location) {
         setLocation(location);
         return true;
     }
 
-    @Translation(params = { Entity.class, TeleportCause.class })
+    @Bridge(params = { Entity.class, TeleportCause.class })
     public boolean teleport(Entity entity) {
         setLocation(entity.getLocation());
         return true;
     }
 
-    @Translation({
-            @For(name = "isValid"),
-            @For(name = "isPersistent"),
-            @For(name = "hasPlayedBefore"),
-            @For(name = "isWhitelisted"),
-            @For(name = "isOnline"),
-            @For(name = "isInvisible"),
-            @For(name = "isInvulnerable"),
-            @For(name = "hasPermission", params = String.class),
-            @For(name = "hasPermission", params = Permission.class),
-            @For(name = "isPermissionSet", params = String.class),
-            @For(name = "isPermissionSet", params = Permission.class),
-            @For(name = "isOp")
-    })
+    @Bridge(name = "isValid")
+    @Bridge(name = "isPersistent")
+    @Bridge(name = "hasPlayedBefore")
+    @Bridge(name = "isWhitelisted")
+    @Bridge(name = "isOnline")
+    @Bridge(name = "isInvisible")
+    @Bridge(name = "isInvulnerable")
+    @Bridge(name = "hasPermission", params = String.class)
+    @Bridge(name = "hasPermission", params = Permission.class)
+    @Bridge(name = "isPermissionSet", params = String.class)
+    @Bridge(name = "isPermissionSet", params = Permission.class)
+    @Bridge(name = "isOp")
     protected final boolean Z() {
         return true;
     }

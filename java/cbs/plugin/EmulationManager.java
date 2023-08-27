@@ -1,7 +1,6 @@
-package net.ME1312.CBS;
+package cbs.plugin;
 
-import net.ME1312.CBS.ASM.ASM;
-
+import cbs.asm.ASM;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.command.CommandMap;
@@ -53,9 +52,10 @@ public final class EmulationManager extends JavaPlugin {
         generator = (MethodHandle) MethodHandles.publicLookup().findStatic(
                 ASM.get(getDataFolder(),
                         "org.objectweb.asm.",
-                        "net.ME1312.CBS.ASM.PlayerVisitor",
-                        "net.ME1312.CBS.ASM.TranslationVisitor"
-                ).loadClass("net.ME1312.CBS.ASM.PlayerVisitor"),
+                        "bridge.asm.",
+                        "cbs.asm.PlayerVisitor",
+                        "cbs.asm.TranslationVisitor"
+                ).loadClass("cbs.asm.PlayerVisitor"),
                 "generateExtension", MethodType.methodType(MethodHandle.class, Plugin.class)
         ).invokeExact((Plugin) this);
     }

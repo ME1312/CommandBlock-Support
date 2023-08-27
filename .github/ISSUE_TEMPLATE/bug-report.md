@@ -5,7 +5,7 @@ about: Report an issue with CBS
 ---
 
 ### Platform Information
-Paste in the version information from the SubServers app in question here. To get this info, run the `/cbs` command with no arguments.
+Paste in the version information from the CBS plugin here. To get this info, run the `/cbs` command with no arguments.
 
 ### What Happened
 Here you can write about what happened that shouldn't have. If you have any errors in your console related to what happened, you should also paste those here.

@@ -1,4 +1,4 @@
-package net.ME1312.CBS.ASM;
+package cbs.asm;
 
 public final class MemoryClassLoader extends ClassLoader {
     private final String name;

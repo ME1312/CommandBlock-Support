@@ -1,4 +1,4 @@
-package net.ME1312.CBS;
+package cbs.plugin;
 
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;

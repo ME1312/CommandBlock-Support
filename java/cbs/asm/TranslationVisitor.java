@@ -1,4 +1,4 @@
-package net.ME1312.CBS.ASM;
+package cbs.asm;
 
 import org.bukkit.Bukkit;
 import org.objectweb.asm.*;
@@ -9,16 +9,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
-import static net.ME1312.CBS.ASM.PlayerVisitor.DEBUG;
+import static bridge.asm.Types.load;
 import static org.objectweb.asm.Opcodes.*;
 
 class TranslationVisitor extends ClassVisitor {
-    private static final String TRANSLATION = "Lnet/ME1312/CBS/ASM/Translation;";
-    private static final String DEBUG_DESC = "Lnet/ME1312/CBS/ASM/SuppressDebugging;";
-
+    private static final int MAX_ARITY = 255;
     final HashMap<String, Sender> translations = new HashMap<>();
     final HashSet<String> classes = new HashSet<>();
     boolean flip, spaced;
@@ -47,7 +45,7 @@ class TranslationVisitor extends ClassVisitor {
             try {
                 scan(Class.forName(path.replace('/', '.')), path);
             } catch (ClassNotFoundException e) {
-                if (DEBUG) log("Failed to locate class: ", path.replace('/', '.'));
+                if (PlayerVisitor.DEBUG) log("Failed to locate class: ", path.replace('/', '.'));
             }
         }
     }
@@ -57,14 +55,14 @@ class TranslationVisitor extends ClassVisitor {
         if (stream != null) {
             ClassReader reader = new ClassReader(stream);
             reader.accept(this, 0);
-        } else if (DEBUG) {
+        } else if (PlayerVisitor.DEBUG) {
             log("Failed to locate classfile: ", clazz.getCanonicalName());
         }
     }
 
     @Override
     public void visit(int version, int access, String name, String signature, String extended, String[] implemented) {
-        if (DEBUG) {
+        if (PlayerVisitor.DEBUG) {
             if (!spaced) {
                 log.info("");
                 log.info("");
@@ -75,7 +73,7 @@ class TranslationVisitor extends ClassVisitor {
 
     @Override
     public void visitEnd() {
-        if (DEBUG) {
+        if (PlayerVisitor.DEBUG) {
             log.info("");
             log.info("");
             spaced = true;
@@ -89,25 +87,32 @@ class TranslationVisitor extends ClassVisitor {
     }
 
     private static final class Parser extends AnnotationVisitor {
+        private int fromIndex, toIndex, length = MAX_ARITY;
         private final List<Sender> senders;
-        private final String name, desc, returns;
+        private final String name, desc;
         private String $name, $desc;
-        private int index;
 
-        private Parser(List<Sender> senders, String name, String descriptor, String returns) {
+
+        Parser(String name, String descriptor, List<Sender> senders) {
             super(ASM9);
+            this.name = $name = name;
+            this.desc = $desc = descriptor;
             this.senders = senders;
-            this.name = name;
-            this.desc = descriptor;
-            this.returns = returns;
         }
 
         @Override
         public void visit(String name, Object value) {
-            if ("index".equals(name)) {
-                index = (int) (Integer) value;
-            } else {
+            if ("name".equals(name)) {
                 $name = value.toString();
+            } else if ("fromIndex".equals(name)) {
+                if ((fromIndex = Math.min((int) value, MAX_ARITY)) < 0) fromIndex = 0;
+            } else if ("toIndex".equals(name)) {
+                if ((toIndex = Math.min((int) value, MAX_ARITY)) < 0) toIndex = 0;
+            } else if ("length".equals(name)) {
+                if ((length = Math.min((int) value, MAX_ARITY)) < 0) length = 0;
+            } else if ("returns".equals(name)) {
+                String desc = $desc;
+                $desc = new StringBuilder(desc).replace(desc.indexOf(')') + 1, desc.length(), value.toString()).toString();
             }
         }
 
@@ -115,7 +120,7 @@ class TranslationVisitor extends ClassVisitor {
         public AnnotationVisitor visitArray(String name) {
             if ("params".equals(name)) {
                 return new AnnotationVisitor(ASM9) {
-                    private final StringBuilder desc = new StringBuilder("(");
+                    private final StringBuilder desc = new StringBuilder().append('(');
 
                     @Override
                     public void visit(String name, Object descriptor) {
@@ -124,14 +129,15 @@ class TranslationVisitor extends ClassVisitor {
 
                     @Override
                     public void visitEnd() {
-                        $desc = desc.append(')').append(returns).toString();
+                        String desc = $desc;
+                        $desc = this.desc.append(')').append(desc, desc.indexOf(')') + 1, desc.length()).toString();
                     }
                 };
             } else {
                 return new AnnotationVisitor(ASM9) {
                     @Override
                     public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                        return new Parser(senders, Parser.this.name, desc, returns);
+                        return new Parser(Parser.this.name, desc, senders);
                     }
                 };
             }
@@ -139,8 +145,8 @@ class TranslationVisitor extends ClassVisitor {
 
         @Override
         public void visitEnd() {
-            if ($name != null || $desc != null || index != 0) {
-                senders.add(new Sender(($name != null)? $name : name, ($desc != null)? $desc : desc, index, true));
+            if (!$name.equals(name) || !$desc.equals(desc)) {
+                senders.add(new Sender($name, $desc, fromIndex, toIndex, length, true));
             }
         }
     }
@@ -154,10 +160,10 @@ class TranslationVisitor extends ClassVisitor {
 
                 @Override
                 public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
-                    if (desc.equals(DEBUG_DESC)) {
+                    if (desc.equals("Lcbs/asm/SuppressDebugging;")) {
                         debug = false;
-                    } else if (desc.equals(TRANSLATION)) {
-                        return new Parser(senders, name, descriptor, Type.getReturnType(descriptor).getDescriptor());
+                    } else if (desc.equals("Lbridge/Bridges;") || desc.equals("Lbridge/Bridge;")) {
+                        return new Parser(name, descriptor, senders);
                     }
                     return null;
                 }
@@ -169,12 +175,12 @@ class TranslationVisitor extends ClassVisitor {
                     if ((access & ACC_ABSTRACT) == 0) {
                         translation = new Receiver(name, descriptor, params, debug, null);
                     } else if (name.equals("getServer") && params.length == 0) {
-                        translation = new Receiver(name, descriptor, params, debug, (mv, returns) -> {
+                        translation = new Receiver(name, descriptor, params, debug, mv -> {
                             mv.visitMethodInsn(INVOKESTATIC, "org/bukkit/Bukkit", name, descriptor, false);
                             mv.visitInsn(ARETURN);
                         });
                     } else if (name.equals("getPlayer") && params.length == 0) {
-                        translation = new Receiver(name, descriptor, params, debug, (mv, returns) -> {
+                        translation = new Receiver(name, descriptor, params, debug, mv -> {
                             mv.visitVarInsn(ALOAD, 0);
                             mv.visitInsn(ARETURN);
                         });
@@ -183,7 +189,7 @@ class TranslationVisitor extends ClassVisitor {
                     }
 
                     for (Sender sender : senders) add(sender, translation);
-                    if ((access & ACC_FINAL) == 0) add(new Sender(name, descriptor, 0, false), translation);
+                    if ((access & ACC_FINAL) == 0) add(new Sender(name, descriptor, 0, 0, MAX_ARITY, false), translation);
                 }
             };
         } else {
@@ -194,11 +200,11 @@ class TranslationVisitor extends ClassVisitor {
     private void add(Sender sender, Receiver receiver) {
         translations.compute(identify(sender.name, sender.desc), (key, value) -> {
             if (value == null) {
-                if (DEBUG) log.info(((sender.synthetic)? "@Found: " : "Found:  ") + sender.name + sender.desc);
+                if (PlayerVisitor.DEBUG) log.info(((sender.synthetic)? "@Found: " : "Found:  ") + sender.name + sender.desc);
                 sender.translation = receiver;
                 return sender;
             } else {
-                if (DEBUG && !sender.synthetic) log.info("Merged: " + sender.name + sender.desc);
+                if (PlayerVisitor.DEBUG && !sender.synthetic) log.info("Merged: " + sender.name + sender.desc);
                 return value;
             }
         });
@@ -207,13 +213,15 @@ class TranslationVisitor extends ClassVisitor {
     final static class Sender {
         private Receiver translation;
         final String name, desc;
+        final int fromIndex, toIndex, length;
         final boolean synthetic;
-        final int index;
 
-        private Sender(String name, String descriptor, int index, boolean synthetic) {
+        private Sender(String name, String descriptor, int fromIndex, int toIndex, int length, boolean synthetic) {
             this.name = name;
             this.desc = descriptor;
-            this.index = index;
+            this.fromIndex = fromIndex;
+            this.toIndex = toIndex;
+            this.length = length;
             this.synthetic = synthetic;
         }
 
@@ -223,7 +231,7 @@ class TranslationVisitor extends ClassVisitor {
     }
 
     final static class Receiver {
-        final BiConsumer<MethodVisitor, Type> special;
+        final Consumer<MethodVisitor> special;
         final String name, desc;
         final Type[] params;
         private final Class<?>[] args;
@@ -231,7 +239,7 @@ class TranslationVisitor extends ClassVisitor {
         final Type returns;
         final boolean debug;
 
-        private Receiver(String name, String descriptor, Type[] params, boolean debug, BiConsumer<MethodVisitor, Type> special) {
+        private Receiver(String name, String descriptor, Type[] params, boolean debug, Consumer<MethodVisitor> special) {
             this.name = name;
             this.desc = descriptor;
             this.params = params;
@@ -243,8 +251,9 @@ class TranslationVisitor extends ClassVisitor {
 
         boolean checkcast(int param, Type type) {
             try {
-                if (this.args[param] == null) this.args[param] = load(params[param]);
-                return !load(type).isAssignableFrom(args[param]);
+                ClassLoader loader = ASM.class.getClassLoader();
+                if (this.args[param] == null) this.args[param] = load(loader, params[param]);
+                return !load(loader, type).isAssignableFrom(args[param]);
             } catch (ClassNotFoundException e) {
                 return true;
             }
@@ -252,38 +261,11 @@ class TranslationVisitor extends ClassVisitor {
 
         boolean checkcast(Type type) {
             try {
-                if (this.type == null) this.type = load(returns);
-                return !load(type).isAssignableFrom(this.type);
+                ClassLoader loader = ASM.class.getClassLoader();
+                if (this.type == null) this.type = load(loader, returns);
+                return !load(loader, type).isAssignableFrom(this.type);
             } catch (ClassNotFoundException e) {
                 return true;
-            }
-        }
-
-        private static Class<?> load(Type type) throws ClassNotFoundException {
-            switch (type.getSort()) {
-                case Type.VOID:
-                    return void.class;
-                case Type.BOOLEAN:
-                    return boolean.class;
-                case Type.CHAR:
-                    return char.class;
-                case Type.BYTE:
-                    return byte.class;
-                case Type.SHORT:
-                    return short.class;
-                case Type.INT:
-                    return int.class;
-                case Type.FLOAT:
-                    return float.class;
-                case Type.LONG:
-                    return long.class;
-                case Type.DOUBLE:
-                    return double.class;
-                case Type.ARRAY:
-                case Type.OBJECT:
-                    return Class.forName(type.getInternalName().replace('/', '.'));
-                default:
-                    throw new AssertionError();
             }
         }
     }

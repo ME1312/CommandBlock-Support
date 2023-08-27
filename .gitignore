@@ -1,8 +1,10 @@
-# Hide System and IDE Generated Files
-/out/
+# Hide System/IDE files
 .idea/
 *.iml
 .DS_STORE
 
-# Hide Compiled Artifacts
-/artifacts/*
+
+# Hide generated artifacts
+/artifacts/
+/build/
+/javadoc/
