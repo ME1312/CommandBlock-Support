@@ -1,5 +1,6 @@
 package cbs.plugin;
 
+import bridge.Unchecked;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -60,7 +61,7 @@ final class Command extends org.bukkit.command.Command {
                 sender.sendMessage(prefix(RED, DARK_RED) + "No command to execute");
             }
         } else {
-            boolean sub = false, debug = false;
+            boolean debug = false, sub = false, preserve = false;
             double x = 0, y = 0, z = 0;
             float yaw = 0, pitch = 0;
             World world = null;
@@ -127,6 +128,10 @@ final class Command extends org.bukkit.command.Command {
                             }
                             case 's': {
                                 sub = true;
+                                continue;
+                            }
+                            case 'p': {
+                                preserve = true;
                                 continue;
                             }
                             case 'n': {
@@ -208,10 +213,9 @@ final class Command extends org.bukkit.command.Command {
             if (world == null) {
                 sender.sendMessage(prefix(RED, DARK_RED) + "The " + DARK_RED + "-w" + RED + " flag must be used when sending from console");
             } else {
-                if (uid == null) uid = UUID.nameUUIDFromBytes(((name == null)? "cbs:" : "cbs:" + name).getBytes(StandardCharsets.UTF_8));
-                EmulatedPlayer player = plugin.getPlayer(uid);
+                EmulatedPlayer player = plugin.getPlayer((uid != null)? uid : UUID.nameUUIDFromBytes(((name == null)? "cbs:" : "cbs:" + name).getBytes(StandardCharsets.UTF_8)));
+                if (!preserve || player.getWorld() == null) player.setLocation(world, x, y, z, yaw, pitch);
                 if (name != null) player.name = name;
-                player.setLocation(world, x, y, z, yaw, pitch);
                 player.debug = debug;
 
                 try {
@@ -238,7 +242,7 @@ final class Command extends org.bukkit.command.Command {
         try {
             command = ((CommandMap) commands.invokeExact(Bukkit.getServer())).getCommand(label);
         } catch (Throwable e) {
-            throw Unsafe.rethrow(e);
+            throw new Unchecked(e);
         }
 
         if (command == null) {
@@ -273,6 +277,7 @@ final class Command extends org.bukkit.command.Command {
         Map<Integer, Flag> map = new LinkedHashMap<Integer, Flag>();
         map.compute((int) 'd', (c, v) -> new Flag(Collections.emptyList(), c));
         map.compute((int) 's', (c, v) -> new Flag(Collections.emptyList(), c));
+        map.compute((int) 'p', (c, v) -> new Flag(Collections.emptyList(), c));
         map.compute((int) 'n', (c, v) -> new Flag(Collections.singletonList("<username>"), c));
         map.compute((int) 'u', (c, v) -> new Flag(Collections.singletonList("<uuid>"), c));
         map.compute((int) 'w', (c, v) -> new Flag(Collections.singletonList("<world>"), c));
@@ -374,7 +379,7 @@ final class Command extends org.bukkit.command.Command {
                 try {
                     map = (Map<String, ?>) mappings.invokeExact((CommandMap) commands.invoke(Bukkit.getServer()));
                 } catch (Throwable e) {
-                    throw Unsafe.rethrow(e);
+                    throw new Unchecked(e);
                 }
 
                 for (String command : map.keySet()) if (command.startsWith(last)) {
@@ -389,7 +394,7 @@ final class Command extends org.bukkit.command.Command {
                 try {
                     command = ((CommandMap) commands.invoke(Bukkit.getServer())).getCommand(args[i]);
                 } catch (Throwable e) {
-                    throw Unsafe.rethrow(e);
+                    throw new Unchecked(e);
                 }
 
                 if (command != null) {

@@ -1,5 +1,6 @@
 package cbs.plugin;
 
+import bridge.Unchecked;
 import cbs.asm.ASM;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
@@ -43,7 +44,7 @@ public final class EmulationManager extends JavaPlugin {
             reference = new RuntimeException();
             reference.setStackTrace(new StackTraceElement[0]);
         } catch (Throwable e) {
-            throw Unsafe.rethrow(e);
+            throw new Unchecked(e);
         }
     }
 
@@ -78,7 +79,7 @@ public final class EmulationManager extends JavaPlugin {
                 mappings.register(prefix, command);
             }
         } catch (Throwable e) {
-            throw Unsafe.rethrow(e);
+            throw new Unchecked(e);
         }
     }
 
@@ -91,7 +92,7 @@ public final class EmulationManager extends JavaPlugin {
             try {
                 return (EmulatedPlayer) generator.invokeExact(uid);
             } catch (Throwable e) {
-                throw Unsafe.rethrow(e);
+                throw new Unchecked(e);
             }
         });
     }

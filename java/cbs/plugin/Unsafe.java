@@ -24,14 +24,6 @@ final class Unsafe {
     }
 
     // Only misc utility methods beyond this point
-    static RuntimeException rethrow(Throwable e) {
-        return Unsafe.<RuntimeException>uncheck(e);
-    }
-
-    private static <T extends Throwable> T uncheck(Throwable e) throws T {
-        throw (T) e;
-    }
-
     public String toString() {
         return toString(data);
     }
